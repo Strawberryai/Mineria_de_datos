@@ -1,0 +1,8 @@
+# Ignorar archivos MNIST
+*-ubyte
+*.pdf
+*.zip
+*.csv
+
+.ipynb_checkpoints/*
+mnist-clustering.ipynb
