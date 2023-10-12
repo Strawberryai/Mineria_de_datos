@@ -50,7 +50,7 @@ class hierarchical_clustering:
             plt.ylabel("Distancia")
             plt.show()
 
-            hierarchical_cluster = AgglomerativeClustering(n_clusters=2, affinity='euclidean', linkage="ward")
+            hierarchical_cluster = AgglomerativeClustering(n_clusters=2, affinity='euclidean', linkage='ward')
             labels = hierarchical_cluster(self.vectors)
             x=[1, 2,  8,  8, 10,  3]
             y=[2, 3, 7, 9, 11, 4]
