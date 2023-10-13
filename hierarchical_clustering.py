@@ -9,9 +9,6 @@ class hierarchical_clustering:
         self.clusters = [{i} for i in range(len(vectors))]
         self.distance_type = inter_distance_type
         self.distances = [[self.distance(vectors[i], vectors[j]) for j in range(len(vectors))] for i in range(len(vectors))]
-        
-
-    # ... (resto del código)
 
     def distance(self, vec1, vec2):
         if self.distance_type == 'single':
@@ -40,17 +37,6 @@ class hierarchical_clustering:
         new_cluster = cluster1.union(cluster2)
         return new_cluster
 
-    """def find_closest_clusters(self):
-        min_distance = float('inf')
-        min_i, min_j = None, None
-
-        for i in range(len(self.clusters)):
-            for j in range(i+1, len(self.clusters)):
-                if self.distances[i][j] < min_distance:
-                    min_distance = self.distances[i][j]
-                    min_i, min_j = i, j
-
-        return min_i, min_j"""
     def find_closest_clusters(self):
         min_distance = float('inf')
         min_i, min_j = None, None
@@ -84,16 +70,6 @@ class hierarchical_clustering:
         cluster_indices = list(self.clusters[0])
         result = [self.vectors[i] for i in cluster_indices]
         return result, merge_history
-
-    """def plot_dendrogram(self):
-        Z = linkage(self.vectors)
-        plt.figure(figsize=(10, 5))
-        dendrogram(Z, labels=[str(i) for i in range(len(self.vectors))], show_contracted=True)  # Agrega show_contracted=True
-        plt.title("Dendrograma de Clustering Jerárquico")
-        plt.xlabel("Índice de la Muestra")
-        plt.ylabel("Distancia")
-        plt.show()"""
-
 
 
 
@@ -137,45 +113,6 @@ class hierarchical_clustering:
 
         plt.show()
 
-        """
-        plt.figure(figsize=(10, 5))
-
-        clusters = {}  # Un diccionario para mantener un registro de los clusters fusionados
-
-        for i, (cluster1, cluster2, distancia) in enumerate(merge_history):
-            # Obtener las coordenadas de los clusters fusionados
-            x1, y1 = clusters.get(cluster1, (i, 0))
-            x2, y2 = clusters.get(cluster2, (i, 0))
-
-            # Calcular las coordenadas del punto medio
-            x_mid = i + len(merge_history)
-            y_mid = distancia
-
-            # Dibujar líneas que unen los clusters
-            plt.plot([x1, x1, x_mid], [y1, y_mid, y_mid], 'bo-')  # Línea hacia cluster1
-            plt.plot([x2, x2, x_mid], [y2, y_mid, y_mid], 'ro-')  # Línea hacia cluster2
-
-            # Dibujar línea que conecta cluster1 y cluster2
-            plt.plot([x1, x2], [y_mid, y_mid], 'k--')
-
-            # Actualizar la posición del nuevo cluster fusionado
-            clusters[i + len(merge_history)] = (x_mid, y_mid)
-
-        plt.title("Visualización de Uniones de Clusters")
-        plt.xlabel("Clusters")
-        plt.ylabel("Distancia")
-        plt.grid(True)
-        plt.show()
-        """
-        
-
-
-
-    
-
-
-
-
 
 
 if __name__ == "__main__":
@@ -199,4 +136,3 @@ if __name__ == "__main__":
         hc.plot_dendrogram(merge_history)
 
    
-   #,'complete','average'"""
