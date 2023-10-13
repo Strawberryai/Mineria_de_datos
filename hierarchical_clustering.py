@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 import matplotlib.pyplot as plt
 from matplotlib.patches import FancyArrowPatch
 import networkx as nx
+import pickle
 class hierarchical_clustering:
     def __init__(self, vectors, inter_distance_type):
         self.vectors = vectors
@@ -50,10 +51,10 @@ class hierarchical_clustering:
                         min_i, min_j = i, j
 
         return min_i, min_j
-    def cluster(self):
+    def cluster(self, target_clusters):
         merge_history = []  # Lista para almacenar historial de fusiones (índices y distancias)
         
-        while len(self.clusters) > 1:
+        while len(self.clusters) > target_clusters:
             i, j = self.find_closest_clusters()
             new_cluster = self.merge_clusters(self.clusters[i], self.clusters[j])
             
@@ -112,9 +113,27 @@ class hierarchical_clustering:
         plt.title('Dendrograma Jerarquico usando '+ self.distance_type + ' distance')
 
         plt.show()
+    def print_clusters(self):
+        clusters = self.clusters
+        for i, cluster in enumerate(clusters):
+            print(f'Cluster {i+1}:')
+            for idx in cluster:
+                print(f'    Vector {idx+1}: {self.vectors[idx]}')
 
+    def predict(self, new_vector):
+        distances_to_clusters = [self.distance(new_vector, self.vectors[i]) for i in range(len(self.vectors))]
+        closest_cluster_idx = distances_to_clusters.index(min(distances_to_clusters))
 
+        return closest_cluster_idx
+    def export(self, filename):
+        with open(filename, 'wb') as file:
+            pickle.dump(self, file)
 
+    @staticmethod
+    def load(filename):
+        with open(filename, 'rb') as file:
+            return pickle.load(file)
+        
 if __name__ == "__main__":
     vectors = [[142, 120, 47, 4, 37],
  [34.3434, 187, 68, 145, 5],
@@ -130,9 +149,14 @@ if __name__ == "__main__":
     for distance_type in ['single','complete','average']:
         hc = hierarchical_clustering(vectors, distance_type)
         
-        result, merge_history = hc.cluster()
+        result, merge_history = hc.cluster(target_clusters=2)
         #print(result)
         print(merge_history)
+        hc.print_clusters()
         hc.plot_dendrogram(merge_history)
+        new_vector = [130, 110, 50, 10, 40]
+        predicted_cluster = hc.predict(new_vector)
+
+        print(f'El nuevo vector {new_vector} pertenece al cluster {predicted_cluster + 1}')
 
    
