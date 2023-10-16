@@ -2,7 +2,7 @@ from scipy.cluster.hierarchy import dendrogram, linkage
 import matplotlib.pyplot as plt
 import matplotlib.pyplot as plt
 from matplotlib.patches import FancyArrowPatch
-import networkx as nx
+#import networkx as nx
 import pickle
 class hierarchical_clustering:
     def __init__(self, vectors, inter_distance_type):
@@ -18,19 +18,31 @@ class hierarchical_clustering:
             return self.complete_linkage_distance(vec1, vec2)
         elif self.distance_type == 'average':
             return self.average_linkage_distance(vec1, vec2)
+        elif self.distance_type == 'mean':
+            return self.mean_linkage_distance(vec1, vec2)
 
     def single_linkage_distance(self, vec1, vec2):
-        print("Usando distancia single-link")
+        #print("Usando distancia single-link")
         return min(self.distance_single(vec1[i], vec2[i]) for i in range(len(vec1)))
 
     def complete_linkage_distance(self, vec1, vec2):
-        print("Usando distancia complete-link")
+        #print("Usando distancia complete-link")
         return max(self.distance_single(vec1[i], vec2[i]) for i in range(len(vec1)))
 
     def average_linkage_distance(self, vec1, vec2):
-        print("Usando distancia avg-link")
+        #print("Usando distancia avg-link")
         return sum(self.distance_single(vec1[i], vec2[i]) for i in range(len(vec1))) / len(vec1)
-
+    
+    def mean_linkage_distance(self, vec1, vec2):
+        total_distance = 0
+        num_pairs = 0
+        for i in range(len(vec1)):
+            for j in range(len(vec2)):
+                total_distance += self.distance_single(vec1[i], vec2[j])
+                num_pairs += 1
+        
+        return total_distance / num_pairs
+    
     def distance_single(self, x, y):
         return abs(x - y)
 
@@ -51,9 +63,8 @@ class hierarchical_clustering:
                         min_i, min_j = i, j
 
         return min_i, min_j
-    def cluster(self, target_clusters):
+    def cluster(self, target_clusters=3):
         merge_history = []  # Lista para almacenar historial de fusiones (índices y distancias)
-        
         while len(self.clusters) > target_clusters:
             i, j = self.find_closest_clusters()
             new_cluster = self.merge_clusters(self.clusters[i], self.clusters[j])
@@ -146,7 +157,7 @@ if __name__ == "__main__":
  [32, 169.433434, 41, 69, 91],]
 
  
-    for distance_type in ['single','complete','average']:
+    for distance_type in ['single','complete','average','mean']:
         hc = hierarchical_clustering(vectors, distance_type)
         
         result, merge_history = hc.cluster(target_clusters=2)
