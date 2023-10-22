@@ -2,140 +2,266 @@ from scipy.cluster.hierarchy import dendrogram, linkage
 import matplotlib.pyplot as plt
 import matplotlib.pyplot as plt
 from matplotlib.patches import FancyArrowPatch
+import numpy as np
+import random
 #import networkx as nx
 import pickle
+class procesarCluster():
+    def __init__(self,vectors,arbol,num_clusters=4,dist_max=20):
+        self.vectors=vectors
+        self.tree=arbol
+        self.num_clusters=num_clusters
+        self.dist_max=dist_max
+        self.nodoPadre=max(self.tree.keys())
+        self.clusters=[self.nodoPadre]
+        self.centroides={}
+    def obtener_nodos_finales(self, nodo):
+        if self.tree[nodo]['hijo1'] is None and self.tree[nodo]['hijo2'] is None:
+            #print(nodo)
+            return [nodo]
+        else:
+            nodos_finales = []
+            if self.tree[nodo]['hijo1'] is not None:
+                nodos_finales.extend(self.obtener_nodos_finales(self.tree[nodo]['hijo1']))
+            if self.tree[nodo]['hijo2'] is not None:
+                nodos_finales.extend(self.obtener_nodos_finales(self.tree[nodo]['hijo2']))
+            return nodos_finales
+    def calcular_centroide(self,indice,cluster):
+        num_vectores = len(cluster)
+        num_caracteristicas = len(cluster[0])  # Suponemos que todos los vectores tienen la misma longitud
+
+        centroide = [0] * num_caracteristicas
+
+        for vector in cluster:
+            for i in range(num_caracteristicas):
+                centroide[i] += vector[i] / num_vectores
+
+        self.centroides[indice]=centroide
+    def buscar_nodos(self):
+        hemosLlegado=False
+        while len(self.clusters)<4 and not hemosLlegado:
+            dist=0
+            siguiente_nodo=None
+            print(self.clusters)
+            for x in self.clusters:
+                if self.tree[x]['distancia']>dist and self.tree[x]['distancia']> self.dist_max:
+                    dist=self.tree[x]['distancia']
+                    siguiente_nodo=x
+            print("El siguiente nodo:"+str(siguiente_nodo))
+            if(siguiente_nodo) is None:
+                hemosLlegado=True
+            else:
+                self.clusters.remove(x)
+                self.clusters.append(self.tree[siguiente_nodo]['hijo1'])
+                self.clusters.append(self.tree[siguiente_nodo]['hijo2'])
+            print(self.clusters)
+        
+        for x in self.clusters:
+            print("El cluster "+str(x)+" contiene estos vectores:")
+            vectores=[]
+            for y in self.obtener_nodos_finales(x):
+                print(self.vectors[y])
+                vectores.append(self.vectors[y])
+            self.calcular_centroide(x,vectores)     
+        print("Los centroides son:"+str(self.centroides))
 class hierarchical_clustering:
     def __init__(self, vectors, inter_distance_type):
+        self.iters=0
         self.vectors = vectors
-        self.clusters = [{i} for i in range(len(vectors))]
+        self.clusters = [i for i in range(len(vectors))]
         self.distance_type = inter_distance_type
-        self.distances = [[self.distance(vectors[i], vectors[j]) for j in range(len(vectors))] for i in range(len(vectors))]
+        #self.distances = [[self.distance(vectors[i], vectors[j]) for j in range(len(vectors))] for i in range(len(vectors))]
 
-    def distance(self, vec1, vec2):
-        if self.distance_type == 'single':
-            return self.single_linkage_distance(vec1, vec2)
-        elif self.distance_type == 'complete':
-            return self.complete_linkage_distance(vec1, vec2)
-        elif self.distance_type == 'average':
-            return self.average_linkage_distance(vec1, vec2)
-        elif self.distance_type == 'mean':
-            return self.mean_linkage_distance(vec1, vec2)
-
-    def single_linkage_distance(self, vec1, vec2):
-        #print("Usando distancia single-link")
-        return min(self.distance_single(vec1[i], vec2[i]) for i in range(len(vec1)))
-
-    def complete_linkage_distance(self, vec1, vec2):
-        #print("Usando distancia complete-link")
-        return max(self.distance_single(vec1[i], vec2[i]) for i in range(len(vec1)))
-
-    def average_linkage_distance(self, vec1, vec2):
-        #print("Usando distancia avg-link")
-        return sum(self.distance_single(vec1[i], vec2[i]) for i in range(len(vec1))) / len(vec1)
     
-    def mean_linkage_distance(self, vec1, vec2):
-        total_distance = 0
-        num_pairs = 0
-        for i in range(len(vec1)):
-            for j in range(len(vec2)):
-                total_distance += self.distance_single(vec1[i], vec2[j])
-                num_pairs += 1
+
+    
+    
+    def actualizar_arbol(self, nodo1, nodo2, distancia):
+        num_nodos = len(self.vectors)+self.iters 
+        nueva_distancia =  0
+        self.clusters.remove(nodo1)
+        self.clusters.remove(nodo2)
+        self.clusters.append(num_nodos)
+        # Crear el nuevo nodo
+        nuevo_nodo = {
+            'hijo1': nodo1,
+            'hijo2': nodo2,
+            'distancia': distancia,
+            'iteracion': self.iters #ESTO PARA NUM CLUSTERS!!
+            #'padre':None,
+            #'vector': None  # Aquí deberías definir el vector del nuevo nodo si es necesario
+        }
+        print("nuevo nodo" + str(nuevo_nodo))
+        # Añadir el nuevo nodo al árbol
+        self.tree[num_nodos] = nuevo_nodo
+
+        # Incrementar el contador de iteraciones
+
+        return num_nodos
+    def obtener_nodos_finales(self, nodo):
+        if self.tree[nodo]['hijo1'] is None and self.tree[nodo]['hijo2'] is None:
+            #print(nodo)
+            return [nodo]
+        else:
+            nodos_finales = []
+            if self.tree[nodo]['hijo1'] is not None:
+                nodos_finales.extend(self.obtener_nodos_finales(self.tree[nodo]['hijo1']))
+            if self.tree[nodo]['hijo2'] is not None:
+                nodos_finales.extend(self.obtener_nodos_finales(self.tree[nodo]['hijo2']))
+            return nodos_finales
+
+    def generar_diccionario(self):
+        resultado = {}
+        for i, array in enumerate(self.vectors):
+            id_unico = i  # Incrementamos en 1 para que los IDs comiencen en 1
+            resultado[id_unico] = {'hijo1': None, 'hijo2': None, 'distancia': 0, 'iteracion': -1}
+        return resultado
+    
+    def generar_distancias(self):
+        n = len(self.vectors)
+        vectores=[np.array(vec) for vec in self.vectors]
+        distancias = {}
+
+        for i in range(n):
+            for j in range(i+1, n):
+                distancia = np.linalg.norm(vectores[i] - vectores[j])
+                distancias[(i, j)] = distancia
+                distancias[(j, i)] = distancia
+        return distancias
+    def mean_link(self,cluster1, cluster2):
+        total_distancia = 0
+        num_pares = 0
+        for punto1 in cluster1:
+            for punto2 in cluster2:
+                total_distancia += self.distancias[(punto1, punto2)]
+                num_pares += 1
+        return total_distancia / num_pares
+    def single_link(self,cluster1, cluster2):
+        min_distancia = float('inf')
+        for punto1 in cluster1:
+            for punto2 in cluster2:
+                distancia = self.distancias[(punto1, punto2)]
+                if distancia < min_distancia:
+                    min_distancia = distancia
+        return min_distancia
+    def complete_link(self,cluster1, cluster2):
+        max_distancia = 0
+        for punto1 in cluster1:
+            for punto2 in cluster2:
+                distancia = self.distancias[(punto1, punto2)]
+                if distancia > max_distancia:
+                    max_distancia = distancia
+        return max_distancia
+    def average_link(self,cluster1, cluster2):
+        total_distancia = 0
+        num_pares = 0
+        for punto1 in cluster1:
+            for punto2 in cluster2:
+                total_distancia += self.distancias[(punto1, punto2)]
+                num_pares += 1
+        return total_distancia / num_pares
+
+    def distancia_intracluster(self,ind_vect_cluster1,ind_vect_cluster2):
+        #'single','complete','average','mean'
+        if(self.distance_type=="single"):
+            distancia=self.single_link(ind_vect_cluster1,ind_vect_cluster2)
+        elif(self.distance_type=="average"):
+            distancia=self.average_link(ind_vect_cluster1,ind_vect_cluster2)
+        elif(self.distance_type=="mean"):
+            distancia=self.mean_link(ind_vect_cluster1,ind_vect_cluster2)
+        else:
+            distancia=self.complete_link(ind_vect_cluster1,ind_vect_cluster2)
+        print("Distancia entre cluster:"+str(ind_vect_cluster1)+" y cluster:"+str(ind_vect_cluster2)+" :"+str(distancia))
         
-        return total_distance / num_pairs
+        return(distancia)
     
-    def distance_single(self, x, y):
-        return abs(x - y)
-
-    def merge_clusters(self, cluster1, cluster2):
-        new_cluster = cluster1.union(cluster2)
-        return new_cluster
-
-    def find_closest_clusters(self):
-        min_distance = float('inf')
-        min_i, min_j = None, None
-
+    def encontrar_clusters_mas_cercanos(self):
+        distancia_minima = float('inf')
+        indice_cluster1 = None
+        indice_cluster2 = None
+            
         for i in range(len(self.clusters)):
-            for j in range(i+1, len(self.clusters)):
-                # Asegurémonos de que los índices estén en los límites de la matriz de distancias
-                if i < len(self.distances) and j < len(self.distances[i]):
-                    if self.distances[i][j] < min_distance:
-                        min_distance = self.distances[i][j]
-                        min_i, min_j = i, j
+            cluster1 = self.clusters[i]
+            vectores_cluster1=self.obtener_nodos_finales(cluster1)
+            for j in range(i + 1, len(self.clusters)):
+                
+                cluster2 = self.clusters[j]
+                
+                vectores_cluster2=self.obtener_nodos_finales(cluster2)
+                
+                distancia = self.distancia_intracluster(vectores_cluster1, vectores_cluster2)
+                
+                if distancia < distancia_minima:
+                    distancia_minima = distancia
+                    indice_cluster1 = cluster1
+                    indice_cluster2 = cluster2
+                elif distancia == distancia_minima:
+                    if random.choice([True, False]):
+                        indice_cluster1 = cluster1
+                        indice_cluster2 = cluster2
+        print("Los nodos más cercanos son:"+str(indice_cluster1)+" y "+str(indice_cluster2))
+        
+        return indice_cluster1, indice_cluster2,distancia_minima
 
-        return min_i, min_j
+         
     def cluster(self, target_clusters=3):
-        merge_history = []  # Lista para almacenar historial de fusiones (índices y distancias)
-        while len(self.clusters) > target_clusters:
-            i, j = self.find_closest_clusters()
-            new_cluster = self.merge_clusters(self.clusters[i], self.clusters[j])
+        if self.iters == 0:
+            self.tree = self.generar_diccionario()
+            self.distancias=self.generar_distancias()
             
-            # Guardar información sobre la fusión
-            merge_history.append((i, j, self.distances[i][j]))
             
-            self.clusters.pop(j)
-            self.distances.pop(j)
-            for row in self.distances:
-                row.pop(j)
-            self.clusters[i] = new_cluster
 
-        # Obtener los vectores correspondientes a los índices en el cluster final
-        cluster_indices = list(self.clusters[0])
-        result = [self.vectors[i] for i in cluster_indices]
-        return result, merge_history
-
-
-
-    def plot_dendrogram(self,uniones):
+        while len(self.clusters) > 1:
+            #nodo1, nodo2 = self.encontrar_nodos_mas_cercanos()
+            #self.actualizar_arbol(nodo1, nodo2)
+            nodo1,nodo2,distancia=self.encontrar_clusters_mas_cercanos()
+            self.actualizar_arbol(nodo1,nodo2,distancia)
+            self.iters += 1
+        proc=procesarCluster(self.vectors,self.tree)
+        proc.buscar_nodos()
+        return self.tree,proc
+    def draw_dendrogram(self):
+        # Obtener las distancias y las uniones
+        linkage=[]
+        nodos_base=len(self.vectors)
+        for key in self.tree:
+            if(self.tree[key]['hijo1'] is not None):
+                linkage.append([int(self.tree[key]['hijo1']),int(self.tree[key]['hijo2']),float(self.tree[key]['distancia']),int(len(self.obtener_nodos_finales(key)))])
+        print(linkage)    
+        linkage= sorted(linkage, key=lambda x: x[2])
+    
+        # Crear el dendrograma
         plt.figure(figsize=(10, 5))
-
-        # Inicializar un diccionario para rastrear las posiciones de los clusters
-        cluster_pos = {}
-
-        # Ordenar las uniones por distancia
-        merge_history.sort(key=lambda x: x[2])
-
-        for i, (cluster1, cluster2, distancia) in enumerate(merge_history):
-            # Obtener las posiciones de los clusters fusionados
-            x1 = cluster_pos.get(cluster1, cluster1)
-            x2 = cluster_pos.get(cluster2, cluster2)
-            
-            # Calcular la posición del punto medio
-            x_mid = (x1 + x2) / 2
-
-            # Guardar la posición del nuevo cluster fusionado
-            cluster_pos[i + len(merge_history)] = x_mid
-
-            # Dibujar una línea vertical que conecta los clusters
-            plt.plot([x1, x1, x2, x2], [0, distancia, distancia, 0], 'k-', lw=0.5)
-
-            # Dibujar una línea horizontal que representa la distancia
-            plt.plot([x1, x2], [distancia, distancia], 'k-', lw=0.5)
-
-            # Dibujar un punto en el punto medio
-            plt.plot(x_mid, distancia, 'ko', markersize=3)
-
-            # Etiquetar la distancia
-            plt.text(x_mid, distancia, f'{distancia:.2f}', va='bottom', ha='center', fontsize=8)
-
-        # Establecer límites y etiquetas
-        plt.xlim(-1, len(merge_history) * 2 + 1)
-        plt.xlabel('Clusters')
+        dendrogram(linkage,labels=list(range(len(linkage)+1)), leaf_rotation=90, leaf_font_size=8, orientation='top')
+        plt.xlabel('Índices de los clusters')
         plt.ylabel('Distancia')
-        plt.title('Dendrograma Jerarquico usando '+ self.distance_type + ' distance')
-
+        plt.title('Dendrograma '+'Distancia:'+self.distance_type)
         plt.show()
-    def print_clusters(self):
-        clusters = self.clusters
-        for i, cluster in enumerate(clusters):
-            print(f'Cluster {i+1}:')
-            for idx in cluster:
-                print(f'    Vector {idx+1}: {self.vectors[idx]}')
 
-    def predict(self, new_vector):
-        distances_to_clusters = [self.distance(new_vector, self.vectors[i]) for i in range(len(self.vectors))]
-        closest_cluster_idx = distances_to_clusters.index(min(distances_to_clusters))
+    def draw_tree(self):
+        fig, ax = plt.subplots(figsize=(10, 8))
+        ax.axis('off')
+        
+        # Dibuja los nodos
+        for node_id, node_info in self.tree.items():
+            if node_info['hijo1'] is not None:
+                x1, y1 = node_id, node_info['iteracion']
+                x2, y2 = node_info['hijo1'], self.tree[node_info['hijo1']]['iteracion']
+                ax.plot([x1, x2], [y1, y2], 'k-', lw=2)
+            if node_info['hijo2'] is not None:
+                x1, y1 = node_id, node_info['iteracion']
+                x2, y2 = node_info['hijo2'], self.tree[node_info['hijo2']]['iteracion']
+                ax.plot([x1, x2], [y1, y2], 'k-', lw=2)
+            
+            ax.plot(node_id, node_info['iteracion'], 'ko', ms=10)
+            
+            # Agrega la distancia en azul y en un tamaño más grande
+            if node_info['distancia'] > 0:
+                ax.text(node_id, node_info['iteracion'], f'{node_info["distancia"]:.2f}', ha='center', va='center', color='blue', fontsize=12)
+        
+        plt.show()
 
-        return closest_cluster_idx
+
     def export(self, filename):
         with open(filename, 'wb') as file:
             pickle.dump(self, file)
@@ -160,14 +286,12 @@ if __name__ == "__main__":
     for distance_type in ['single','complete','average','mean']:
         hc = hierarchical_clustering(vectors, distance_type)
         
-        result, merge_history = hc.cluster(target_clusters=2)
-        #print(result)
+        merge_history,proc = hc.cluster(target_clusters=1)
         print(merge_history)
-        hc.print_clusters()
-        hc.plot_dendrogram(merge_history)
-        new_vector = [130, 110, 50, 10, 40]
-        predicted_cluster = hc.predict(new_vector)
-
-        print(f'El nuevo vector {new_vector} pertenece al cluster {predicted_cluster + 1}')
+        print(hc.vectors)
+        hc.draw_tree()
+        hc.draw_dendrogram()
+        #hc.obtener_nodos_finales(11)
+        #hc.print_clusters()
 
    
