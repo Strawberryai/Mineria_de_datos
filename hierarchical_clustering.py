@@ -7,13 +7,14 @@ import random
 #import networkx as nx
 import pickle
 class procesarCluster():
-    def __init__(self,vectors,arbol,num_clusters=4,dist_max=20):
+    def __init__(self,vectors,arbol,num_clusters=4,dist_max=20,distance_type='single'):
+        self.distance_type=distance_type
         self.vectors=vectors
         self.tree=arbol
         self.num_clusters=num_clusters
         self.dist_max=dist_max
         self.nodoPadre=max(self.tree.keys())
-        self.clusters=[self.nodoPadre]
+        self.clusters=[]
         self.centroides={}
     def obtener_nodos_finales(self, nodo):
         if self.tree[nodo]['hijo1'] is None and self.tree[nodo]['hijo2'] is None:
@@ -26,6 +27,34 @@ class procesarCluster():
             if self.tree[nodo]['hijo2'] is not None:
                 nodos_finales.extend(self.obtener_nodos_finales(self.tree[nodo]['hijo2']))
             return nodos_finales
+        
+    def añadir_linkage(self,linkage,nodo):
+        if(self.tree[nodo]['hijo1'] is not None):
+            linkage.append([int(self.tree[nodo]['hijo1']),int(self.tree[nodo]['hijo2']),float(self.tree[nodo]['distancia']),int(len(self.obtener_nodos_finales(nodo)))])
+            linkage=self.añadir_linkage(linkage,(self.tree[nodo]['hijo1']))
+            linkage=self.añadir_linkage(linkage,(self.tree[nodo]['hijo2']))
+        return(linkage)
+    def draw_dendrogram(self):
+        return
+        # Obtener las distancias y las uniones
+        linkage=[]
+        nodos_base=len(self.vectors)
+        for x in self.clusters:
+            linkage=self.añadir_linkage(linkage,x)
+        print("---------------------------------")
+        print(self.clusters)
+            
+        linkage= sorted(linkage, key=lambda x: x[2])
+        print(linkage)
+        # Crear el dendrograma
+        plt.figure(figsize=(10, 5))
+        dendrogram(linkage,labels=list(range(len(linkage)+1)), leaf_rotation=90, leaf_font_size=8, orientation='top')
+        plt.xlabel('Índices de los clusters')
+        plt.ylabel('Distancia')
+        plt.title('Dendrograma '+'Distancia:'+self.distance_type)
+        plt.show()
+
+    
     def calcular_centroide(self,indice,cluster):
         num_vectores = len(cluster)
         num_caracteristicas = len(cluster[0])  # Suponemos que todos los vectores tienen la misma longitud
@@ -38,6 +67,7 @@ class procesarCluster():
 
         self.centroides[indice]=centroide
     def buscar_nodos(self):
+        self.clusters=[self.nodoPadre]
         hemosLlegado=False
         while len(self.clusters)<4 and not hemosLlegado:
             dist=0
@@ -64,6 +94,7 @@ class procesarCluster():
                 vectores.append(self.vectors[y])
             self.calcular_centroide(x,vectores)     
         print("Los centroides son:"+str(self.centroides))
+        self.draw_dendrogram()
 class hierarchical_clustering:
     def __init__(self, vectors, inter_distance_type):
         self.iters=0
@@ -72,9 +103,6 @@ class hierarchical_clustering:
         self.distance_type = inter_distance_type
         #self.distances = [[self.distance(vectors[i], vectors[j]) for j in range(len(vectors))] for i in range(len(vectors))]
 
-    
-
-    
     
     def actualizar_arbol(self, nodo1, nodo2, distancia):
         num_nodos = len(self.vectors)+self.iters 
@@ -208,25 +236,30 @@ class hierarchical_clustering:
         if self.iters == 0:
             self.tree = self.generar_diccionario()
             self.distancias=self.generar_distancias()
-            
-            
-
+              
         while len(self.clusters) > 1:
             #nodo1, nodo2 = self.encontrar_nodos_mas_cercanos()
             #self.actualizar_arbol(nodo1, nodo2)
             nodo1,nodo2,distancia=self.encontrar_clusters_mas_cercanos()
             self.actualizar_arbol(nodo1,nodo2,distancia)
             self.iters += 1
-        proc=procesarCluster(self.vectors,self.tree)
+        proc=procesarCluster(self.vectors,self.tree,distance_type=self.distance_type)
         proc.buscar_nodos()
         return self.tree,proc
+    def añadir_linkage(self,linkage,nodo):
+        if(self.tree[nodo]['hijo1'] is not None):
+            linkage.append([int(self.tree[nodo]['hijo1']),int(self.tree[nodo]['hijo2']),float(self.tree[nodo]['distancia']),int(len(self.obtener_nodos_finales(nodo)))])
+            self.añadir_linkage(linkage,(self.tree[nodo]['hijo1']))
+            self.añadir_linkage(linkage,(self.tree[nodo]['hijo2']))
+        return(linkage)
     def draw_dendrogram(self):
         # Obtener las distancias y las uniones
         linkage=[]
         nodos_base=len(self.vectors)
-        for key in self.tree:
-            if(self.tree[key]['hijo1'] is not None):
-                linkage.append([int(self.tree[key]['hijo1']),int(self.tree[key]['hijo2']),float(self.tree[key]['distancia']),int(len(self.obtener_nodos_finales(key)))])
+        for x in self.clusters:
+            linkage=self.añadir_linkage(linkage,x)
+        print("---------------------------------")
+        print(self.clusters)
         print(linkage)    
         linkage= sorted(linkage, key=lambda x: x[2])
     
@@ -289,7 +322,7 @@ if __name__ == "__main__":
         merge_history,proc = hc.cluster(target_clusters=1)
         print(merge_history)
         print(hc.vectors)
-        hc.draw_tree()
+        #hc.draw_tree()
         hc.draw_dendrogram()
         #hc.obtener_nodos_finales(11)
         #hc.print_clusters()
