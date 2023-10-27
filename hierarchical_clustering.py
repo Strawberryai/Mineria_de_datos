@@ -12,7 +12,7 @@ import pickle
 
 # BORRAR EN FUTURO
 #from gensim.utils import simple_preprocess
-#from gensim.models.doc2vec import Doc2Vec
+from gensim.models.doc2vec import Doc2Vec
 #import gensim.downloader
 #import smart_open
 
@@ -21,7 +21,7 @@ from gensim.models.doc2vec import Doc2Vec, TaggedDocument
 import pandas as pd
 
 #import os
-#from dockembeddings import vec_docEmbeddings
+from dockembeddings import vec_docEmbeddings
 
 class procesarCluster():
     def __init__(self,vectors,arbol,num_clusters=4,dist_max=20,distance_type='single',p=2):
@@ -402,12 +402,24 @@ class hierarchical_clustering:
         # Obtener las distancias y las uniones
         linkage=[]
         nodos_base=len(self.vectors)
+        """"
         for x in self.clusters:
             linkage=self.añadir_linkage(linkage,x)
         print("---------------------------------")
         print(self.clusters)
-        print(linkage)    
+        print(linkage)
         linkage= sorted(linkage, key=lambda x: x[2])
+        """
+        linkage=[]
+        for clave in sorted(self.tree.keys(), reverse=True):
+            #print(clave)
+            if(self.tree[clave]['hijo1']is not None):
+                linkage.append([int(self.tree[clave]['hijo1']),int(self.tree[clave]['hijo2']),float(self.tree[clave]['distancia']),int(len(self.obtener_nodos_finales(clave)))])
+       
+        print("------------------------")
+        linkage=linkage[::-1]
+        print(linkage)
+       
     
         # Crear el dendrograma
         plt.figure(figsize=(10, 5))
@@ -476,7 +488,7 @@ if __name__ == "__main__":
     
     # Obtenemos la vectorizaciÃ³n de los documentos
     train_corpus = list(vec_docEmbeddings(train_df["open_response"], model))
-    vectors = train_corpus[400:700]
+    vectors = train_corpus[400:2400]
     test=train_corpus[900:1000]
  
     for distance_type in ['complete','single','mean','average']:
