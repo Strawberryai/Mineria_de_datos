@@ -21,7 +21,7 @@ from gensim.models.doc2vec import Doc2Vec, TaggedDocument
 import pandas as pd
 
 #import os
-from dockembeddings import vec_docEmbeddings
+#from dockembeddings import vec_docEmbeddings
 
 class procesarCluster():
     def __init__(self,vectors,arbol,num_clusters=4,dist_max=20,distance_type='single',p=2):
@@ -252,7 +252,7 @@ class hierarchical_clustering:
             self.clusters_ind[i]=[i]
             for j in range(i+1, n):
                 distancia =  distance.minkowski(vectores[i],vectores[j],self.grado)
-                distancia = np.linalg.norm(vectores[i] - vectores[j])
+                #distancia = np.linalg.norm(vectores[i] - vectores[j])
                 distancias[(i, j)] = distancia
                 distancias[(j, i)] = distancia
         return distancias
@@ -488,11 +488,11 @@ if __name__ == "__main__":
     
     # Obtenemos la vectorizaciÃ³n de los documentos
     train_corpus = list(vec_docEmbeddings(train_df["open_response"], model))
-    vectors = train_corpus[400:2400]
+    vectors = train_corpus[400:700]
     test=train_corpus[900:1000]
  
     for distance_type in ['complete','single','mean','average']:
-        hc = hierarchical_clustering(vectors, distance_type,p=5)
+        hc = hierarchical_clustering(vectors, distance_type,p=3)
         merge_history,proc = hc.cluster()
         proc.buscar_nodos(num_clusters=4,dist_max=0)
         labels=proc.predict_multiple(test)
