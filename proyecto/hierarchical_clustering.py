@@ -236,6 +236,28 @@ class procesarCluster():
             plt.bar(siluetas.keys(), siluetas.values(), align='center', color='#007acc')
             input("graficando siluetas")
         
+    def dist_cofonetica(self):
+        # Esta métrica mide cuán bien la jerarquía de clustering representa la estructura original de tus datos
+        # Mide la correlación entre las distancias cophenéticas (distancias entre los elementos originales) 
+        # y las distancias en la jerarquía de clustering
+        linkage=[]
+        for clave in sorted(self.tree.keys(), reverse=True):
+            #print(clave)
+            if(self.tree[clave]['hijo1']is not None):
+                linkage.append([int(self.tree[clave]['hijo1']),int(self.tree[clave]['hijo2']),float(self.tree[clave]['distancia']),int(len(self.obtener_nodos_finales(clave)))])
+       
+        linkage=linkage[::-1] #invertir el orden de la array
+        print(linkage)
+        
+        #print(squareform(cophenet(linkage, pdist(self.vectors))))
+        c, coph_dists = cophenet(linkage, pdist(self.vectors))
+        print(c)
+        print(coph_dists)
+        # c es la distancia de correlación cofenética
+        # coph_dists contiene las distancias cophenéticas entre tus datos, 
+        # estos sonla representación jerárquica de las distancias entre los elementos originales
+        input("cofonetica")  
+        
 class hierarchical_clustering:
     def __init__(self, vectors, inter_distance_type,p=2):
         #CONSTRUCTORA DE LA CLASE DE ENTRENAMIENTO
