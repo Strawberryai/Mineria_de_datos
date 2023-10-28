@@ -9,12 +9,7 @@ import pandas as pd
 
 import os
 
-data_dir = "."
-model_file = 'my_doc2vec.model'
-train_file = 'verbalAutopsy_train.csv'
-test_file = 'verbalAutopsy_test.csv'
-
-def preprocesado(texto)
+def preprocesado(texto):
     # PRE: Un texto
     # POST: Tockens del texto preprocesado
     return simple_preprocess(texto)
@@ -30,25 +25,17 @@ def train_docModel(texts, model_file):
     # Guardamos el modelo
     model.save(model_file)
 
+def load_docModel(model_file):
+    # Cargamos el modelo
+    # model = gensim.downloader.load('glove-twitter-25')
+    model = Doc2Vec.load(model_file)
+    return model
 
 def vec_docEmbeddings(docs, model):
+    # PRE: una lista de documentos y el modelo de doc-embeddings
+    # POST: lista de (id, vector)
     for i, line in enumerate(docs):
         # Preprocesado del documento
         tokens = preprocesado(line)
-        # Vectorizamos
-        yield model.infer_vector(tokens)
-
-
-# Entrenamos el modelo
-train_docModel(pd.read_csv(train_file)['open_response'], model_file)
-
-# Cargamos el modelo
-model = Doc2Vec.load(model_file)
-# model = gensim.downloader.load('glove-twitter-25')
-
-# Cargamos los datos
-train_df = pd.read_csv(train_file)
-
-
-# Obtenemos la vectorizaciÃ³n de los documentos
-train_corpus = list(vec_docEmbeddings(train_df["open_response"], model))
+        # Vectorizamos -> indice, vector
+        yield (i, model.infer_vector(tokens))

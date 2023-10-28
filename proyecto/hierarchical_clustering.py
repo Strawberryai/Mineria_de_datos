@@ -6,21 +6,6 @@ import random
 from scipy.spatial import distance
 import pickle
 
-
-
-
-# BORRAR EN FUTURO
-#from gensim.utils import simple_preprocess
-#from gensim.models.doc2vec import Doc2Vec
-#import gensim.downloader
-#import smart_open
-
-#from gensim.test.utils import common_texts
-#from gensim.models.doc2vec import Doc2Vec, TaggedDocument
-#import pandas as pd
-
-#import os
-#from dockembeddings import vec_docEmbeddings
 def help():
     print("########################Ayuda para el uso de la clase hierarchical_clustering####################################################")
     print("#1.-Cuando se llama a la constructora se le dan los vectores, el grado para la distancia minkowski y el tipo de distancia intergrupal")
@@ -53,6 +38,7 @@ def help():
     print("#Finally, you can visualize the tree generated in the hierarchical clustering class using the draw_dendrogram method")
     print("#    example: hc.draw_dendrogram()")
     print("#################################################################################################################################")
+    
 class procesarCluster():
     def __init__(self,vectors,arbol,num_clusters=4,dist_max=20,distance_type='single',p=2):
         self.distance_type=distance_type
@@ -237,7 +223,7 @@ class hierarchical_clustering:
         distancia=9999
         for x in self.clusters:
             #print("Se esta recalculando distancia de "+ str(x)+" y " + str(num_nodos))
-            if(distance_type!="average"):
+            if(self.distance_type!="average"):
                 distancia=self.distancia_intracluster(self.clusters_ind[num_nodos],self.clusters_ind[x])
             self.distancias[num_nodos,x]=distancia
             self.distancias[x,num_nodos]=distancia
@@ -440,7 +426,8 @@ class hierarchical_clustering:
     def load(filename):
         with open(filename, 'rb') as file:
             return pickle.load(file)
-        
+
+
 if __name__ == "__main__":
     vectors = [[142, 120, 47, 4, 37],
  [34.3434, 187, 68, 145, 5],
