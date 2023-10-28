@@ -226,7 +226,16 @@ class procesarCluster():
         # Después de recorrer todas las combinaciones, imprime o utiliza los resultados y siluetas
         print("Resultados:", resultados)
         self.graficar_siluetas(siluetas)
-   
+
+    def graficar_siluetas(self, siluetas):
+            # Representamos los resultados en una gráfica de barras
+            fig, ax = plt.subplots(figsize=(5,2))
+            ax.set_xlabel('label')
+            ax.set_ylabel('Silhouette score')
+
+            plt.bar(siluetas.keys(), siluetas.values(), align='center', color='#007acc')
+            input("graficando siluetas")
+        
 class hierarchical_clustering:
     def __init__(self, vectors, inter_distance_type,p=2):
         #CONSTRUCTORA DE LA CLASE DE ENTRENAMIENTO
