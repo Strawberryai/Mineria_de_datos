@@ -1,7 +1,6 @@
-from scipy.cluster.hierarchy import dendrogram, linkage
+from scipy.cluster.hierarchy import dendrogram
 import matplotlib.pyplot as plt
 import matplotlib.pyplot as plt
-from matplotlib.patches import FancyArrowPatch
 import numpy as np
 import random
 from scipy.spatial import distance
@@ -291,6 +290,7 @@ class hierarchical_clustering:
     
     ##Aqui se hacen las distancias
     def mean_link(self,cluster1, cluster2):
+        #Calcula la distancia mean
         total_distancia = 0
         num_pares = 0
         for punto1 in cluster1:
@@ -299,6 +299,7 @@ class hierarchical_clustering:
                 num_pares += 1
         return total_distancia / num_pares
     def single_link(self,cluster1, cluster2):
+        #Calcula la distancia single
         min_distancia = float('inf')
         for punto1 in cluster1:
             for punto2 in cluster2:
@@ -307,6 +308,7 @@ class hierarchical_clustering:
                     min_distancia = distancia
         return min_distancia
     def complete_link(self,cluster1, cluster2):
+        #Calcula la distancia complete
         max_distancia = 0
         for punto1 in cluster1:
             for punto2 in cluster2:
@@ -315,6 +317,7 @@ class hierarchical_clustering:
                     max_distancia = distancia
         return max_distancia
     def average_link(self,cluster1, cluster2):
+        #Calcula la distancia avg
         total_distancia = 0
         num_pares = 0
         for punto1 in cluster1:
@@ -449,7 +452,7 @@ class hierarchical_clustering:
                 linkage.append([int(self.tree[clave]['hijo1']),int(self.tree[clave]['hijo2']),float(self.tree[clave]['distancia']),int(len(self.obtener_nodos_finales(clave)))])
        
         print("------------------------")
-        linkage=linkage[::-1]
+        linkage=linkage[::-1] #invertir el orden de la array
         print(linkage)
        
     
