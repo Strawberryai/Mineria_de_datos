@@ -22,7 +22,21 @@ import pandas as pd
 
 #import os
 #from dockembeddings import vec_docEmbeddings
-
+def help():
+    print("########################Ayuda para el uso de la clase hierarchical_clustering####################################################")
+    print("#1.-Cuando se llama a la constructora se le dan los vectores, el grado para la distancia minkowski y el tipo de distancia intergrupal")
+    print("#    ejemplo : hc = hierarchical_clustering(vectors, distance_type,p=3)")
+    print("#2.-Para iniciar la clusterización se llama al metodo cluster de esa misma clase")
+    print("#    ejemplo : proc = hc.cluster()")
+    print("#Este metodo devuelve un objeto de la clase procesarCluster, que como su nombre indica es la clase que se encarga de analizar el arbol generado por la clusterizacion")
+    print("#3.-Si queremos, por ejemplo, obtener 4 clusters con una distancia maxima de 20 se podría expresar tal que así")
+    print("#    ejemplo : proc.buscar_nodos(num_clusters=4,dist_max=0)")
+    print("#4.-Esta clase también se encarga de hacer las predicciones, tiene dos metodos para esto, predict y predict_multiple, el primero devuelve el lavel de un vector, y el segundo devuelve el de varios vectores en un diccionario")
+    print("#    ejemplo :  labels=proc.predict_multiple(test)")
+    print("#En ese último caso se devolverian los labels del test que contendría un array de vectores")
+    print("#5.-Finalmente, se podrá visualizar el arbol generado en la clase hierarchical clustering mediante el metodo draw_dendrogram()")
+    print("#    ejemplo : hc.draw_dendrogram()")
+    print("#################################################################################################################################")
 class procesarCluster():
     def __init__(self,vectors,arbol,num_clusters=4,dist_max=20,distance_type='single',p=2):
         self.distance_type=distance_type
@@ -150,11 +164,12 @@ class hierarchical_clustering:
         self.vectors = vectors
         self.tree={}
         self.centroides={}
-        if (distance_type=="average"):
+        self.distance_type = inter_distance_type
+        if (self.distance_type=="average"):
             for i in range(len(vectors)):
              self.centroides[i]=self.vectors[i]
         self.clusters = [i for i in range(len(vectors))]
-        self.distance_type = inter_distance_type
+        
         #self.distances = [[self.distance(vectors[i], vectors[j]) for j in range(len(vectors))] for i in range(len(vectors))]
 
     def calcular_centroide(self,indice):
@@ -383,7 +398,7 @@ class hierarchical_clustering:
             self.iters += 1
         proc=procesarCluster(self.vectors,self.tree,distance_type=self.distance_type,p=2)
         
-        return self.tree,proc
+        return proc
     def añadir_linkage(self,linkage,nodo):
         #Metodo para hacer la matriz linkage que representará el dendrograma.
         if distance_type=="average":
@@ -477,7 +492,7 @@ if __name__ == "__main__":
  [189, 128, 189, 13, 99],
  [41, 14, 109, 184, 17],
  [32, 169.433434, 41, 69, 91]]
-
+    help()
     # Cargamos el modelo
     model = Doc2Vec.load('my_doc2vec.model')
     # model = gensim.downloader.load('glove-twitter-25')
@@ -493,7 +508,7 @@ if __name__ == "__main__":
  
     for distance_type in ['complete','single','mean','average']:
         hc = hierarchical_clustering(vectors, distance_type,p=3)
-        merge_history,proc = hc.cluster()
+        proc = hc.cluster()
         proc.buscar_nodos(num_clusters=4,dist_max=0)
         labels=proc.predict_multiple(test)
         print(labels)
