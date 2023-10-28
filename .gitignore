@@ -4,5 +4,5 @@
 *.zip
 *.csv
 
-.ipynb_checkpoints/*
+*.ipynb_checkpoints/*
 mnist-clustering.ipynb
