@@ -3,6 +3,8 @@ from gensim.models.doc2vec import Doc2Vec
 import gensim.downloader
 import smart_open
 
+from scipy.spatial import distance
+
 from gensim.test.utils import common_texts
 from gensim.models.doc2vec import Doc2Vec, TaggedDocument
 import pandas as pd
@@ -37,4 +39,19 @@ def vec_docEmbeddings(docs, model):
         # Preprocesado del documento
         tokens = preprocesado(line)
         # Vectorizamos -> indice, vector
-        yield (i, model.infer_vector(tokens))
+        yield model.infer_vector(tokens)
+        
+
+def obtener_vector_mas_cercano(x_train, vector):
+    # PRE: x_train y un vector. x_train es una lista de todos los documentos vectorizados
+    # POST: índice del vector más cercano del x_train
+    
+    min_dist = float("inf")
+    index = 0
+    for i,x in enumerate(x_train):
+        d = distance.minkowski(x, vector, 2)
+        if d < min_dist:
+            min_dist = d
+            index = i
+    
+    return index

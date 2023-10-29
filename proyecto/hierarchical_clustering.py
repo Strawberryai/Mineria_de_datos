@@ -6,6 +6,8 @@ import random
 from scipy.spatial import distance
 import pickle
 
+from sklearn.metrics import silhouette_score
+
 def help():
     print("########################Ayuda para el uso de la clase hierarchical_clustering####################################################")
     print("#1.-Cuando se llama a la constructora se le dan los vectores, el grado para la distancia minkowski y el tipo de distancia intergrupal")
@@ -158,12 +160,11 @@ class procesarCluster():
                 self.clusters.append(self.tree[siguiente_nodo]['hijo2'])
                 
             #print(self.clusters)
-        return vectores
+        
         for x in self.clusters:
             print("El cluster "+str(x)+" contiene estos vectores:")
             vectores=[]
             for y in self.obtener_nodos_finales(x):
-                print(self.vectors[y])
                 vectores.append(self.vectors[y])
             self.calcular_centroide(x)     
         print("Los centroides son:"+str(self.centroides))
@@ -175,42 +176,25 @@ class procesarCluster():
         with open(filename, 'wb') as file:
             pickle.dump(self, file)
         print(f"Guardado en {filename}")
+    
     def dict_to_array(self, dict_labels, num_samples):
         labels = [dict_labels.get(i, -1) for i in range(num_samples)]
         return labels
 
-    def metrics_evaluation(self):
-        input("evaluacion")
-        resultados = {}
-        siluetas = {}
-        n_clusts = list(range(2,len(self.vectors),1))
-        n_dims = list(range(1, max(len(vec) for vec in self.vectors) + 1))
-        #dists = self.rango_de_distancias(self.vectors)
-        for c in n_clusts:
-            X = self.cortar_arbol(num_clusters=c, dist_max=0)
-            X_fit = np.array(X)
-            print(X_fit)
-            #nodos_X = self.obtener_nodos_finales(self.nodoPadre)
-            #print(nodos_X)
-            input("silueta calculo")
-            # Obtenemos las etiquetas
-            labels_dic = self.predict_multiple(X_fit)
-            labels = self.dict_to_array(labels_dic ,len(X_fit))
-            print(labels)
-            input("labels")
-            silueta = 0
-            if len(np.unique(labels))>1:
-                silueta = silhouette_score(X, labels, metric='euclidean')  # Calcula la puntuación de la silueta
-            # Almacena los resultados en un diccionario
-            resultado = {
-                'clusters': c,
-                'silueta': silueta
-            }
-            resultados[c] = resultado
-
-        # Después de recorrer todas las combinaciones, imprime o utiliza los resultados y siluetas
-        print("Resultados:", resultados)
-        self.graficar_siluetas(siluetas)
+    def silhouette_score(self, num_clusters, dist_max):
+        self.cortar_arbol(num_clusters=num_clusters, dist_max=dist_max)
+        print("NUM CLUSTERS")
+        print(len(self.clusters))
+        X = []
+        Y = []
+        for c in self.clusters:
+            indices = self.obtener_nodos_finales(c)
+            instancias = [self.vectors[i] for i in indices]
+            X.extend(instancias)
+            Y.extend([c] * len(instancias))
+        
+        # Calcula la puntuación de la silueta
+        return silhouette_score(X, Y, metric='euclidean')
    
 class hierarchical_clustering:
     def __init__(self, vectors, inter_distance_type,p=2):
@@ -464,30 +448,4 @@ class hierarchical_clustering:
 
 
 if __name__ == "__main__":
-    vectors = [[142, 120, 47, 4, 37],
- [34.3434, 187, 68, 145, 5],
- [138, 83, 185, 26, 176],
- [66, 134, 96, 168, 149],
- [64, 58, 199.34343, 77, 175],
- [101, 138, 170, 16, 62],
- [189, 128, 189, 13, 99],
- [41, 14, 109, 184, 17],
- [32, 169.433434, 41, 69, 91]]
-    help()
-    for distance_type in ['complete','single','mean','average']:
-        hc = hierarchical_clustering(vectors, distance_type,p=3)
-        proc = hc.cluster()
-        proc.cortar_arbol(num_clusters=3,dist_max=0)
-        proc.draw_dendrogram()
-        labels=proc.predict_multiple(vectors)
-        proc.save()
-        proc2=hierarchical_clustering.load("complete_3.pkl")
-        proc2.cortar_arbol(num_clusters=4,dist_max=0)
-        proc2.draw_dendrogram()
-        print(labels)
-
-
-    exit(0)
-
-
-   
+    help() 
