@@ -158,7 +158,7 @@ class procesarCluster():
                 self.clusters.append(self.tree[siguiente_nodo]['hijo2'])
                 
             #print(self.clusters)
-        
+        return vectores
         for x in self.clusters:
             print("El cluster "+str(x)+" contiene estos vectores:")
             vectores=[]
@@ -175,7 +175,42 @@ class procesarCluster():
         with open(filename, 'wb') as file:
             pickle.dump(self, file)
         print(f"Guardado en {filename}")
+    def dict_to_array(self, dict_labels, num_samples):
+        labels = [dict_labels.get(i, -1) for i in range(num_samples)]
+        return labels
 
+    def metrics_evaluation(self):
+        input("evaluacion")
+        resultados = {}
+        siluetas = {}
+        n_clusts = list(range(2,len(self.vectors),1))
+        n_dims = list(range(1, max(len(vec) for vec in self.vectors) + 1))
+        #dists = self.rango_de_distancias(self.vectors)
+        for c in n_clusts:
+            X = self.cortar_arbol(num_clusters=c, dist_max=0)
+            X_fit = np.array(X)
+            print(X_fit)
+            #nodos_X = self.obtener_nodos_finales(self.nodoPadre)
+            #print(nodos_X)
+            input("silueta calculo")
+            # Obtenemos las etiquetas
+            labels_dic = self.predict_multiple(X_fit)
+            labels = self.dict_to_array(labels_dic ,len(X_fit))
+            print(labels)
+            input("labels")
+            silueta = 0
+            if len(np.unique(labels))>1:
+                silueta = silhouette_score(X, labels, metric='euclidean')  # Calcula la puntuación de la silueta
+            # Almacena los resultados en un diccionario
+            resultado = {
+                'clusters': c,
+                'silueta': silueta
+            }
+            resultados[c] = resultado
+
+        # Después de recorrer todas las combinaciones, imprime o utiliza los resultados y siluetas
+        print("Resultados:", resultados)
+        self.graficar_siluetas(siluetas)
    
 class hierarchical_clustering:
     def __init__(self, vectors, inter_distance_type,p=2):
