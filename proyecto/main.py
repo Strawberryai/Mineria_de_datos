@@ -4,10 +4,12 @@ from dockembeddings import train_docModel, load_docModel, vec_docEmbeddings
 from hierarchical_clustering import hierarchical_clustering
 
 import pandas as pd
+import matplotlib.pyplot as plt
+from sklearn.decomposition import PCA
 
 # VARIABLES GLOBALES
 data_dir = "."
-model_file = 'my_doc2vec.model'
+doc2vec_model_file = 'my_doc2vec_n200.model'
 train_file = 'verbalAutopsy_train.csv'
 test_file = 'verbalAutopsy_test.csv'
 
@@ -41,7 +43,7 @@ def load_hc_model(filename):
     filename : str
         path del modelo a cargar
     """
-    return hierarchical_clustering.load("complete_3.pkl")
+    return hierarchical_clustering.load(filename)
 
 
 # MAIN
@@ -54,24 +56,41 @@ def main():
     print(y_train.head())
     
     # Obtenemos la vectorizacion de los documentos -> [(index, vector)]
-    # train_docModel(x_train, model_file)
-    docModel = load_docModel(model_file)
+    # Entrenamos el modelo
+    # train_docModel(pd.read_csv(train_file)['open_response'], model_file)
+    docModel = load_docModel(doc2vec_model_file)
     x_train = list(vec_docEmbeddings(x_train, docModel))
     vectores = [vec[1] for vec in x_train]
+    vectores = vectores[0:2999] # 3000 instancias para el entrenamiento
     
-    proc = train_hc_model(vectores, 'complete', 7.5)
+    #proc = train_hc_model(vectores, 'complete', 7.5)
+    proc = load_hc_model("complete_4_n200.pkl")
+    
     # Dibujar arbol completo
-    proc.draw_dendrogram()
+    #proc.draw_dendrogram()
     
     # Cortar el arbol en un numero determinado de clusters
     proc.cortar_arbol(num_clusters=3,dist_max=0)
     
-    # Obtener labels por cada vector
+    # Obtener labels por cada vector -> diccionario
     labels = proc.predict_multiple(vectores)
-    print(labels)
-    
-    #proc = load_hc_model("complete_3.pkl")  
-    #proc.cortar_arbol(num_clusters=4,dist_max=0)
+    #print(labels)
+
+    # Reducir las dimensiones para visualizarlas: PCA
+    pca = PCA(n_components=2)
+    pca.fit(vectores)
+    # Cambio de base a dos dimensiones PCA 
+    x_train_PCAspace = pca.transform(vectores)
+    print('Dimensiones después de aplicar PCA: ',x_train_PCAspace.shape)  
+    samples = 10 # Número de instancias a dibujar
+    # Dibujar los puntos en el espacio, color: cluster, etiqueta-numérica: clase
+    # Color del punto: cluster
+    sc = plt.scatter(x_train_PCAspace[:samples,0],x_train_PCAspace[:samples,1], cmap=plt.cm.get_cmap('nipy_spectral', 10),c=list(labels.values())[:samples])
+    plt.colorbar()
+
+    # Etiqueta numérica: clase 
+    for i in range(samples):
+        plt.text(x_train_PCAspace[i,0],x_train_PCAspace[i,1], y_train[i])
 
 if __name__ == "__main__":
     main()

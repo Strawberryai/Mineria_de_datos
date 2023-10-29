@@ -17,10 +17,9 @@ def preprocesado(texto):
 def train_docModel(texts, model_file):
     # Inicializamos y entrenamos un modelo Doc2Vec
     #documents = [TaggedDocument(doc, [i]) for i, doc in enumerate(common_texts)]
-    train_df = pd.read_csv(train_file)
     documents = [TaggedDocument(preprocesado(doc), [i]) for i, doc in enumerate(texts)]
 
-    model = Doc2Vec(documents, vector_size=200, window=2, min_count=1, workers=4)
+    model = Doc2Vec(documents, vector_size=100, window=2, min_count=1, workers=4)
 
     # Guardamos el modelo
     model.save(model_file)
