@@ -40,7 +40,6 @@ def vec_docEmbeddings(docs, model):
         tokens = preprocesado(line)
         # Vectorizamos -> indice, vector
         yield model.infer_vector(tokens)
-        
 
 def obtener_vector_mas_cercano(x_train, vector):
     # PRE: x_train y un vector. x_train es una lista de todos los documentos vectorizados

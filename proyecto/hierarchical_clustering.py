@@ -86,6 +86,12 @@ class procesarCluster():
         plt.ylabel('Distancia')
         plt.title('Dendrograma '+'Distancia:'+self.distance_type)
         plt.show()
+    
+    def obtener_indice_instancia_mas_cercana(vector):
+        label, dist, nodo = self.predict(vector)
+        
+        return
+    
     def predict(self,vector):
         #Pre: Se da un vector
         #Post: Devuelve el label de a que cluster pertenece
@@ -98,15 +104,16 @@ class procesarCluster():
                 distancia=nueva_dist
                 nodo=x
                 label=x
+                
         print("El punto:"+" pertenece al cluster:"+str(nodo)+" con una distancia de:"+str(distancia))
-        return(label)
+        return(label, distancia, nodo)
     def predict_multiple(self,vectors):
         #Pre: Se da una lista de vectores
         #Post: Devuelve un diccionario que asocia cada indice de la lista de vectores con el cluster al que pertenece
         labels={}
         i=0
         for x in vectors:
-            labels[i]=self.predict(x)
+            labels[i]=self.predict(x)[0]
             i+=1
         return(labels)
     def añadir_linkage(self,linkage,nodo):

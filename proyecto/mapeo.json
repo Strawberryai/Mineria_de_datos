@@ -1,0 +1,16 @@
+{
+    "0":    ["Diarrhea/Dysentery", "Other infectious diseases", "AIDS", "Sepsis", "Meningitis", "Meningitis/Sepsis", "Malaria", "Encephalitis", "Measles", "Hemorrhagic Fever", "TB"],
+    "1":    ["Leukemia/Lymphomas", "Colorectal Cancer", "Lung Cancer", "Cervical Cancer", "Breast Cancer", "Stomach Cancer", "Prostate Cancer", "Esophageal Cancer", "Other Cancers"],
+    "2":    ["Diabetes"],
+    "3":    ["Epilepsy"],
+    "4":    ["Stroke"],
+    "5":    ["Acute Myocardial Infarction"],
+    "6":    ["Pneumonia", "Asthma", "COPD"],
+    "7":    ["Cirrhosis", "Other Digestive Diseases"],
+    "8":    ["Renal Failure"],
+    "9":    ["Preterm Delivery", "Stillbirth", "Maternal", "Birth Asphyxia"],
+    "10":   ["Congenital Malformations"],
+    "11":   ["Bite of Venomous Animal", "Poisonings"],
+    "12":   ["Road Traffic", "Falls", "Homicide", "Fires", "Drowning", "Suicide", "Violent Death", "Other injuries"]
+}
+
