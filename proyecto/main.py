@@ -124,7 +124,7 @@ def calcular_n_optimo_doc2vec():
     plt.grid(True)
     plt.show()  
 
-def obtener_train_mas_cercano(documentos):
+def obtener_train_mas_cercano(documentos, train, proc, docModel):
     test_vectors    = list(vec_docEmbeddings(documentos, docModel))
     test_labels     = []
     test_dists      = []
@@ -319,7 +319,7 @@ def main():
         "the deceased died in a road accident",
         "the deceased was bitten by a snake and died"
     ]
-    obtener_train_mas_cercano(test)
+    obtener_train_mas_cercano(test, train, proc, docModel)
        
     
     ## SCATTER 2D y 3D ##################################################
