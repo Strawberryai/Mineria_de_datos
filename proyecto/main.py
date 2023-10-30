@@ -123,20 +123,55 @@ def calcular_n_optimo_doc2vec():
     # Mostrar el gráfico
     plt.grid(True)
     plt.show()  
-    
 
-def graficar_distancias_documentos(distancias):
-    x = [d[0] for d in distancias]
-    y = [d[1] for d in distancias]
+def obtener_train_mas_cercano(documentos):
+    test_vectors    = list(vec_docEmbeddings(documentos, docModel))
+    test_labels     = []
+    test_dists      = []
+    textos_originales   = []
+    textos_cercanos     = []
+    
+    for i, vec in enumerate(test_vectors):
+        label, dist, index = proc.obtener_indice_instancia_mas_cercana(vec)
+        test_labels.append(i)
+        test_dists.append(dist)
+        
+        texto_original = documentos[i]
+        texto_cercano = train.iloc[index]['open_response']
+        textos_originales.append(texto_original)
+        textos_cercanos.append(texto_cercano)
+        
+        print()
+        print(f"TEXTO ORIGINAL TEST dist: {dist}")
+        print(texto_original)
+        print(f"TEXTO CERCANO TRAIN index: {index}")
+        print(texto_cercano)
+        print()
+        
+    graficar_distancias_documentos(test_labels, test_dists, textos_originales, textos_cercanos)
+
+def graficar_distancias_documentos(x, y, texts1, texts2):   
+    # Función para acortar el texto y agregar puntos suspensivos
+    def acortar_texto(texto, longitud_maxima=70):
+        if len(texto) > longitud_maxima:
+            return texto[:longitud_maxima - 3] + '...'
+        else:
+            return texto
     
     # Asigna colores en función de los valores
     colores = plt.cm.viridis(np.array(y) / max(y))
-    
-    # Crea el gráfico de barras
-    plt.bar(x, y, color=colores)
+
+    # Crea el gráfico de barras horizontales
+    plt.barh(x, y, color=colores)
+
+    # Agrega texto a cada barra
+    for i, y in enumerate(y):
+        t1 = acortar_texto(texts1[i])
+        t2 = acortar_texto(texts2[i])
+        plt.text(0, i, f'{t1}\n{t2}', color='black', va='center')
 
     # Personaliza el gráfico
-    plt.xlabel('Indice documento')
+    plt.xlabel('Indice del texto del test')
     plt.ylabel('Distancia al cluster más cercano')
     plt.title('Estudio de la distancia de documentos a sus respectivos clusters')
     plt.xticks(rotation=45)  # Rota las etiquetas del eje x para mayor legibilidad
@@ -234,11 +269,10 @@ def calcular_silueta_scipy_para(lista_num_clusters, Z, vectores, criterion='maxc
         
     return resultados 
     
-    
 # MAIN
 def main():
     train = pd.read_csv(train_file)
-    datos_df['gs_text34'] = datos_df['gs_text34'].str.lower()
+    train['gs_text34'] = train['gs_text34'].str.lower()
     # Realizamos un encoding de las clases de las instancias en función de un mapeo definido: Pneumonia -> 0; Stroke -> 1...
     train = mapeo_de_labels(train, 'gs_text34') # Añade la columna 'Clases'
     x_train = train['open_response']
@@ -257,7 +291,7 @@ def main():
     
     #proc = train_hc_model(vectores, 'complete', 2)
     
-    proc = load_hc_model("complete_4_n50_3000.pkl")
+    proc = load_hc_model("complete_4_n50_3000_2grado.pkl")
     
     # Dibujar arbol completo
     #proc.draw_dendrogram()
@@ -276,23 +310,17 @@ def main():
     
     ## DISTANCIAS A DOCUMENTOS ##########################################
     test = [
-        "the deceased died after having high fever and anaemia",
-        "the deceased was killed by a sharp weapon",
+        "the caese of death is pneumonia",
         "my daughter while playing slipped and fell down in the sump more water was there at that time hence she plunged in and died nobody has seen her felling in to that other wise this would have not happened",
         "aba bab bb aa aa bha",
         "child was absolutely fine he had no problem he was taken to hospital when he felt some problem after taking poison poison was given by father",
         "the baby died in the womb because mother had malaria",
-        "ppppppppppp pppppppppppp pppppppppppp ppppppppppppp ppppppppppppppppppppppppppppppppppppppppppppp"
+        "ppppppppppp pppppppppppp pppppppppppp ppppppppppppp ppppppppppppppppppppppppppppppppppppppppppppp",
+        "the deceased died in a road accident",
+        "the deceased was bitten by a snake and died"
     ]
-    
-    test_vectors = list(vec_docEmbeddings(test, docModel))
-    print(test_vectors)
-    test_predict         = [proc.predict(x) for x in test_vectors] 
-    test_labels     = [x[0] for x in test_predict]
-    test_distancias = [(i, x[1]) for i,x in enumerate(test_predict)]
-    print(test_distancias)
-    graficar_distancias_documentos(test_distancias)
-     
+    obtener_train_mas_cercano(test)
+       
     
     ## SCATTER 2D y 3D ##################################################
     scatter_2D(vectores, labels, y_train)

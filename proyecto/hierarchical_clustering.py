@@ -87,10 +87,23 @@ class procesarCluster():
         plt.title('Dendrograma '+'Distancia:'+self.distance_type)
         plt.show()
     
-    def obtener_indice_instancia_mas_cercana(vector):
+    def obtener_indice_instancia_mas_cercana(self, vector):
         label, dist, nodo = self.predict(vector)
+        instancias = self.obtener_nodos_finales(nodo)
+        i = None # indice instancia mas cercana
+        distancia=float("inf")
         
-        return
+        for x in instancias:
+            if(self.grado==0):
+                nueva_dist = spatial.distance.cosine(self.vectors[x],vector)
+            else:
+                nueva_dist =  distance.minkowski(self.vectors[x],vector,self.grado)
+
+            if (nueva_dist<distancia):
+                distancia=nueva_dist
+                i = x
+        
+        return (label, dist, i)
     
     def predict(self,vector):
         #Pre: Se da un vector
@@ -98,7 +111,12 @@ class procesarCluster():
         distancia=99999
         nodo=None
         for x in self.centroides.keys():
-            nueva_dist = distance.minkowski(vector, self.centroides[x], p=self.grado)
+            if(self.grado==0):
+                nueva_dist = spatial.distance.cosine(self.centroides[x],vector)
+                #nueva_dist= np.linalg.norm(self.centroides[x] - vector)
+            else:
+                nueva_dist =  distance.minkowski(self.centroides[x],vector,self.grado)
+                
             #nueva_dist = np.linalg.norm(np.array(vector) - np.array(self.centroides[x]))
             if (nueva_dist<distancia):
                 distancia=nueva_dist
@@ -106,7 +124,9 @@ class procesarCluster():
                 label=x
                 
         print("El punto:"+" pertenece al cluster:"+str(nodo)+" con una distancia de:"+str(distancia))
+        
         return(label, distancia, nodo)
+    
     def predict_multiple(self,vectors):
         #Pre: Se da una lista de vectores
         #Post: Devuelve un diccionario que asocia cada indice de la lista de vectores con el cluster al que pertenece
@@ -307,7 +327,13 @@ class hierarchical_clustering:
         for i in range(n):
             self.clusters_ind[i]=[i]
             for j in range(i+1, n):
-                distancia =  distance.minkowski(vectores[i],vectores[j],self.grado)
+                if(self.grado==0):
+                    distancia = spatial.distance.cosine(vectores[i],vectores[j])
+                    
+                    #distancia= np.linalg.norm(vectores[i] - vectores[j])
+                else:
+                    distancia =  distance.minkowski(vectores[i],vectores[j],self.grado)
+                    
                 #distancia = np.linalg.norm(vectores[i] - vectores[j])
                 distancias[(i, j)] = distancia
                 distancias[(j, i)] = distancia
