@@ -1,11 +1,12 @@
-
 # IMPORTS
 from dockembeddings import train_docModel, load_docModel, vec_docEmbeddings
 from hierarchical_clustering import hierarchical_clustering
 
 import pandas as pd
+import numpy as np
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
+import seaborn as sns
 
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import LabelEncoder
@@ -13,7 +14,8 @@ from sklearn.preprocessing import LabelEncoder
 # Para realizar comparaciones con la implementacion de scipy
 from scipy.cluster.hierarchy import linkage, fcluster
 from scipy.spatial.distance import pdist, minkowski
-from sklearn.metrics import silhouette_score
+from sklearn.metrics import silhouette_score, confusion_matrix, ConfusionMatrixDisplay, cohen_kappa_score
+from scipy.optimize import linear_sum_assignment
 
 # VARIABLES GLOBALES
 data_dir = "."
@@ -22,6 +24,61 @@ train_file = 'verbalAutopsy_train.csv'
 test_file = 'verbalAutopsy_test.csv'
 
 # MÉTODOS PARA SIMPLIFICAR
+def mapeo_de_labels(datos_df, columna):
+    # PRE: dataframe con todos los datos. "columna" es la entrada que contiene los labels reales
+    # POST: devuelve el mismo dataframe añadiendo la columna "Clases" en las cuales se mapean los valores de la
+    #       columna que se recibe como parámetro en funcion del diccionario "mapeo"
+    mapeo = {
+        "0":    ["Diarrhea/Dysentery", "Other infectious diseases", "AIDS", "Sepsis", "Meningitis", "Meningitis/Sepsis", "Malaria", "Encephalitis", "Measles", "Hemorrhagic Fever", "TB"],
+        "1":    ["Leukemia/Lymphomas", "Colorectal Cancer", "Lung Cancer", "Cervical Cancer", "Breast Cancer", "Stomach Cancer", "Prostate Cancer", "Esophageal Cancer", "Other Cancers"],
+        "2":    ["Diabetes"],
+        "3":    ["Epilepsy"],
+        "4":    ["Stroke"],
+        "5":    ["Acute Myocardial Infarction"],
+        "6":    ["Pneumonia", "Asthma", "COPD"],
+        "7":    ["Cirrhosis", "Other Digestive Diseases"],
+        "8":    ["Renal Failure"],
+        "9":    ["Preterm Delivery", "Stillbirth", "Maternal", "Birth Asphyxia"],
+        "10":   ["Congenital Malformations"],
+        "11":   ["Bite of Venomous Animal", "Poisonings"],
+        "12":   ["Road Traffic", "Falls", "Homicide", "Fires", "Drowning", "Suicide", "Violent Death", "Other injuries"]
+    }
+    # Convertir el diccionario de mapeo original a minúsculas
+    mapeo = {etiqueta.lower(): [clase.lower() for clase in clases] for etiqueta, clases in mapeo.items()}
+
+    # Función personalizada para mapear
+    def mapear_etiqueta(clase):
+        for etiqueta, clases_lista in mapeo.items():
+            if clase in clases_lista:
+                return etiqueta
+        return None
+
+    datos_df['gs_text34'] = datos_df['gs_text34'].str.lower()
+    datos_df['Clases'] = datos_df['gs_text34'].apply(mapear_etiqueta)
+    
+    return datos_df
+
+def modificar_etiquetas(labels):
+    minimo = min(labels)
+    maximo = max(labels)
+    min_original = 0
+    max_original = 47
+   
+    dict_mapeo = {}
+    for i in range(minimo,maximo):
+        dict_mapeo[min_original]= i 
+        min_original += 1
+    
+    print(dict_mapeo)
+    input("jodienda")
+    etiquetas_mapeadas = [dict_mapeo[etiqueta] for etiqueta in labels]
+    
+    print(etiquetas_mapeadas)
+    input("jodienda")
+    return etiquetas_mapeadas
+    
+    valores_mapeados = min_original + ((labels - minimo) / amplitud) * (max_original - min_original)
+    return valores_mapeados
 def train_hc_model(vectores, tipo_distancia, grado_minkowski=2):
     """
     Método para entrenar un modelo de clustering jerárquico -> procesarCluster
@@ -89,6 +146,114 @@ def scatter_3D(vectores, labels):
     ax.set_xlabel('Eje Z')
     plt.show()
 
+def evaluacion_de_metricas(num_clusters, proc, X_train, y_train, cm, true_labels, pred_labels):
+    proc.graficar_dimensionalidad()
+    input("dimensionalidad")
+    proc.metrics_evaluation()
+    
+def class_to_cluster(proc, x_train, y_train):
+    true_labels = y_train[0:len(x_train)]
+    print(true_labels)
+    input("t_labels")
+    dicc_t_labels = {}
+    lista_nones = []
+    lista_t_labels = []
+    # Creando diccionario de los labels verdaderos
+    for i in range(0, len(x_train)):
+        nuevo_valor = true_labels[i]
+        if nuevo_valor is not None:
+            dicc_t_labels[i] = nuevo_valor
+            lista_t_labels.append(i)
+        else:
+            dicc_t_labels[i] = 10
+            lista_nones.append(i)
+        
+    print(lista_nones)
+    lista_t_labels = [int(valor) for valor in dicc_t_labels.values()]
+    print(lista_t_labels)
+    input("")
+    print("Etiquetas reales: ", len(lista_t_labels))
+    print("Instancias sin etiquetas reales: ", len(lista_nones))
+    input("recuento")
+    t_values, t_counts = np.unique(lista_t_labels, return_counts=True)
+    print(t_values)
+    print(t_counts)
+    #[ 0  1  2  3  4  5  6  7  8  9 11 12]
+    # [532 146 101  10 193 119 353  96 115 524  64 397]
+    input("values")
+    """
+    t_labels_values_ordenados = np.array(values)[np.argsort(-np.array(counts))].tolist()
+    print(t_labels_values_ordenados)
+    input("ordenacion")
+    #[0, 9, 12, 6, 4, 1, 5, 8, 2, 7, 11, 3]
+    """
+    
+    proc.cortar_arbol(num_clusters=len(t_values),dist_max=0)
+    labels = proc.predict_multiple(proc.vectors)
+    print(labels)
+    
+    p_labels_values, p_counts = np.unique(list(labels.values()), return_counts=True)
+    print(p_labels_values)
+    print(p_counts)
+    print(proc.clusters)
+    input("labels")
+    #[5968 5969 5970 5972 5974 5975 5980 5981 5982 5983 5984 5985]
+    #[ 611    9   23   58   29  129  202  171   49  143 1459  116]
+    # Ordenar labels de los predichos para que coincidan con los verdaderos
+    """
+    p_labels_values_ordenados = np.array(values)[np.argsort(-np.array(counts))].tolist()
+    print(p_labels_values_ordenados)
+    input("ordenacion values predichos")
+    # [5984, 5968, 5980, 5981, 5983, 5975, 5985, 5972, 5982, 5974, 5970, 5969]
+    """
+    lista_p_labels = []
+    lista_p_nones = []
+    # crear lista de los labels predichos, sin nones
+    # escalado a chapters
+    for idx in range(0, len(labels)):
+        # obtenemos la etiqueta predicha de cada vector
+        nuevo_valor = labels[idx]
+        if idx is None:
+            lista_p_nones.append(idx)
+        else:
+            # guardamos su etiqueta real correspondiente
+            i = proc.clusters.index(nuevo_valor)
+            lista_p_labels.append(i)
+            
+    print(lista_p_labels)
+    print(lista_t_labels)
+    input("confusion matrix")
+    
+    to_string = lambda x : str(x)
+    # Obtener matriz de confusión Class to clustering eval
+    #cm = confusion_matrix(np.vectorize(to_string)(lista_p_labels), np.vectorize(to_string)(lista_t_labels))
+    cm = confusion_matrix(lista_t_labels, lista_p_labels)
+    
+    """
+    cm_disp = ConfusionMatrixDisplay(cm)
+    cm_disp.plot()
+    plt.show()
+    """
+    # Mapa de calor a partir de la matriz de confusion    
+    ax = sns.heatmap(cm, annot=True, cmap="Blues", fmt="d")
+
+    plt.show()
+
+    #n_cols = [9, , , , , , , , , , , , ]
+    
+    row_ind, col_ind = linear_sum_assignment(-cm)
+    cm_nuevo = cm[:, col_ind]
+
+
+    # Crear una nueva matriz de confusión reasignando las columnas
+    #cm_nuevo = np.array([cm[:, mapeo[label]] for label in values])
+    
+    ax = sns.heatmap(cm_nuevo, annot=True, cmap="Blues", fmt="d")
+    
+    plt.show()
+    
+    return cm_nuevo, lista_t_labels, lista_p_labels
+
 def calcular_silueta_para(lista_num_clusters, proc, dist_max=0):
     resultados = []
     for n in lista_num_clusters:
@@ -142,43 +307,67 @@ def calcular_silueta_scipy_para(lista_num_clusters, Z, vectores, criterion='maxc
         resultados.append((n, sil))
         
     return resultados 
-    
-    
 # MAIN
 def main():
     train = pd.read_csv(train_file)
-    # Realizamos un encoding de las clases de las instancias: Pneumonia -> 0; Stroke -> 1...
-    le = LabelEncoder()
-    train['Clases'] = le.fit_transform(train['gs_text34']) 
-
-    
+    train['gs_text34'] = train['gs_text34'].str.lower()
+    # Realizamos un encoding de las clases de las instancias en función de un mapeo definido: Pneumonia -> 0; Stroke -> 1...
+    train = mapeo_de_labels(train, 'gs_text34') # Añade la columna 'Clases'
     x_train = train['open_response']
+    print(train)
     y_train = train['Clases']
+    print(y_train.unique())
+    plt.bar(y_train.value_counts().index, y_train.value_counts())
+    plt.show()
+    input("valores unicos")
     
-    print(x_train.head())
-    print(y_train.head())
+    #print(x_train.head())
+    #print(y_train.head())
     
+    model_file = 'my_doc2vec_n50.model'
     # Obtenemos la vectorizacion de los documentos -> [(index, vector)]
     # Entrenamos el modelo
-    # train_docModel(pd.read_csv(train_file)['open_response'], model_file)
-    docModel = load_docModel(doc2vec_model_file)
+    #train_docModel(pd.read_csv(train_file)['open_response'], model_file)
+    
+    input("primer train docModel")
+    docModel = load_docModel(model_file)
     x_train = list(vec_docEmbeddings(x_train, docModel))
-    #vectores = x_train
-    #vectores = vectores[0:2999] # 3000 instancias para el entrenamiento
+    vectores = x_train
+    vectores = vectores[0:2000] # 2000 instancias para el entrenamiento
     
     #proc = train_hc_model(vectores, 'complete', 2)
-    
-    proc = load_hc_model("complete_4_n50_3000.pkl")
-    
+    input("cargar modelo hc")
+    proc = load_hc_model("complete_4.pkl") # <---- n50, 2000
+    """
+    proc.cortar_arbol(num_clusters=13,dist_max=0)
+    print(proc.clusters)
+    print(len(proc.clusters))
+    input("clusts")
+    #proc.dist_cofonetica()
+    #proc.graficacion_siluetas()
+    """
+
+    #proc.cortar_arbol(num_clusters=10,dist_max=0)
+    """
+    labels = proc.predict_multiple(proc.vectors)
+    print(labels)
+    print(len(labels))
+    print(min(labels), max(labels))
+    values, counts = np.unique(labels, return_counts=True)
+    print(values)
+    print(counts)
+    """
+    #print(y_train[0:2999])
+    input("class cluster")
+    cm, t_labels, p_labels = class_to_cluster(proc, vectores, y_train)
     # Dibujar arbol completo
-    #proc.draw_dendrogram()
+    proc.draw_dendrogram()
+    evaluacion_de_metricas(num_clusters=13, proc=proc, X_train=x_train, y_train=y_train, cm=cm, true_labels=t_labels, pred_labels=p_labels)
+    
     
     # Cortar el arbol en un numero determinado de clusters
     #proc.cortar_arbol(num_clusters=10,dist_max=0)
-    
-    # Obtener labels por cada vector -> diccionario
-    #labels = proc.predict_multiple(vectores)
-    #scatter_2D(vectores, labels, y_train)
+    labels = proc.predict_multiple(vectores)
     
     ## COMPROBAR DISTANCIAS DE NUEVOS DOCUMENTOS ##########
     nuevo_vector = list(vec_docEmbeddings(["Zakila isogailua sartu no en"], docModel))[0]
@@ -188,6 +377,8 @@ def main():
     # Obtener labels por cada vector -> diccionario
     labels = proc.predict(nuevo_vector)
     print(labels)
+    input("labels")
+    
     
     
     ## SILUETA ##########
