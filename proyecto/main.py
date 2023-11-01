@@ -1,398 +1,611 @@
-# IMPORTS
-from dockembeddings import train_docModel, load_docModel, vec_docEmbeddings
-from hierarchical_clustering import hierarchical_clustering
+from scipy.cluster.hierarchy import dendrogram, cophenet
 
-import pandas as pd
-import numpy as np
 import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D
-import seaborn as sns
+import matplotlib.pyplot as plt
+import numpy as np
+import random
+from scipy.spatial.distance import pdist
+from scipy.spatial import distance
+import pickle
 
+from sklearn.metrics import silhouette_score, silhouette_samples
 from sklearn.decomposition import PCA
-from sklearn.preprocessing import LabelEncoder
 
-# Para realizar comparaciones con la implementacion de scipy
-from scipy.cluster.hierarchy import linkage, fcluster
-from scipy.spatial.distance import pdist, minkowski
-from sklearn.metrics import silhouette_score, confusion_matrix, ConfusionMatrixDisplay, cohen_kappa_score
-from scipy.optimize import linear_sum_assignment
-
-# VARIABLES GLOBALES
-data_dir = "."
-doc2vec_model_file = 'my_doc2vec_n50.model'
-train_file = 'verbalAutopsy_train.csv'
-test_file = 'verbalAutopsy_test.csv'
-
-# MÉTODOS PARA SIMPLIFICAR
-def mapeo_de_labels(datos_df, columna):
-    # PRE: dataframe con todos los datos. "columna" es la entrada que contiene los labels reales
-    # POST: devuelve el mismo dataframe añadiendo la columna "Clases" en las cuales se mapean los valores de la
-    #       columna que se recibe como parámetro en funcion del diccionario "mapeo"
-    mapeo = {
-        "0":    ["Diarrhea/Dysentery", "Other infectious diseases", "AIDS", "Sepsis", "Meningitis", "Meningitis/Sepsis", "Malaria", "Encephalitis", "Measles", "Hemorrhagic Fever", "TB"],
-        "1":    ["Leukemia/Lymphomas", "Colorectal Cancer", "Lung Cancer", "Cervical Cancer", "Breast Cancer", "Stomach Cancer", "Prostate Cancer", "Esophageal Cancer", "Other Cancers"],
-        "2":    ["Diabetes"],
-        "3":    ["Epilepsy"],
-        "4":    ["Stroke"],
-        "5":    ["Acute Myocardial Infarction"],
-        "6":    ["Pneumonia", "Asthma", "COPD"],
-        "7":    ["Cirrhosis", "Other Digestive Diseases"],
-        "8":    ["Renal Failure"],
-        "9":    ["Preterm Delivery", "Stillbirth", "Maternal", "Birth Asphyxia"],
-        "10":   ["Congenital Malformations"],
-        "11":   ["Bite of Venomous Animal", "Poisonings"],
-        "12":   ["Road Traffic", "Falls", "Homicide", "Fires", "Drowning", "Suicide", "Violent Death", "Other injuries"]
-    }
-    # Convertir el diccionario de mapeo original a minúsculas
-    mapeo = {etiqueta.lower(): [clase.lower() for clase in clases] for etiqueta, clases in mapeo.items()}
-
-    # Función personalizada para mapear
-    def mapear_etiqueta(clase):
-        for etiqueta, clases_lista in mapeo.items():
-            if clase in clases_lista:
-                return etiqueta
-        return None
-
-    datos_df['gs_text34'] = datos_df['gs_text34'].str.lower()
-    datos_df['Clases'] = datos_df['gs_text34'].apply(mapear_etiqueta)
+def help():
+    print("########################Ayuda para el uso de la clase hierarchical_clustering####################################################")
+    print("#1.-Cuando se llama a la constructora se le dan los vectores, el grado para la distancia minkowski y el tipo de distancia intergrupal")
+    print("#    ejemplo : hc = hierarchical_clustering(vectors, distance_type,p=3)  #siendo distance_type 'average','mean','complete' o 'single'")
+    print("#2.-Para iniciar la clusterización se llama al metodo cluster de esa misma clase")
+    print("#    ejemplo : proc = hc.cluster()")
+    print("#Este metodo devuelve un objeto de la clase procesarCluster, que como su nombre indica es la clase que se encarga de analizar el arbol generado por la clusterizacion")
+    print("#3.-Si queremos, por ejemplo, obtener 4 clusters con una distancia maxima de 20 se podría expresar tal que así")
+    print("#    ejemplo : proc.buscar_nodos(num_clusters=4,dist_max=10)")
+    print("#4.-Esta clase también se encarga de hacer las predicciones, tiene dos metodos para esto, predict y predict_multiple, el primero devuelve el lavel de un vector, y el segundo devuelve el de varios vectores en un diccionario")
+    print("#    ejemplo :  labels=proc.predict_multiple(test)")
+    print("#En ese último caso se devolverian los labels del test que contendría un array de vectores")
+    print("#5.-Finalmente, se podrá visualizar el arbol generado en la clase hierarchical clustering mediante el metodo draw_dendrogram()")
+    print("#    ejemplo : hc.draw_dendrogram()")
+    print("#################################################################################################################################")
+    print()
+    print("--------------------------------English----------------------------------------------")
+    print()
+    print("########################Help for Using the hierarchical_clustering Class########################################################")
+    print("#When calling the constructor, you need to provide the vectors, the Minkowski distance degree, and the intergroup distance type")
+    print("#    example: hc = hierarchical_clustering(vectors, distance_type, p=3)#being distance_type 'average','mean','complete' or 'single'")
+    print("#To initiate the clustering, you call the cluster method of the same class")
+    print("#    example: proc = hc.cluster()")
+    print("#This method returns an object of the procesarCluster class, which, as the name suggests, is responsible for analyzing the tree generated by clustering")
+    print("#If, for instance, you want to obtain 4 clusters with a maximum distance of 20, you could express it like this")
+    print("#    example: proc.find_nodes(num_clusters=4, dist_max=20)")
+    print("#This class also handles predictions, with two methods for this purpose: predict and predict_multiple. The former returns the label for a single vector, and the latter returns labels for multiple vectors in a dictionary")
+    print("#    example: labels = proc.predict_multiple(test)")
+    print("#In the latter case, it would return labels for the 'test' which would contain an array of vectors")
+    print("#Finally, you can visualize the tree generated in the hierarchical clustering class using the draw_dendrogram method")
+    print("#    example: hc.draw_dendrogram()")
+    print("#################################################################################################################################")
     
-    return datos_df
+class procesarCluster():
+    def __init__(self,vectors,arbol,num_clusters=4,dist_max=20,distance_type='single',p=2):
+        self.distance_type=distance_type
+        self.vectors=vectors
+        self.tree=arbol
+        self.num_clusters=num_clusters
+        self.dist_max=dist_max
+        self.nodoPadre=max(self.tree.keys())
+        self.clusters=[]
+        self.grado=p
+        self.centroides={}
+    def obtener_nodos_finales(self, nodo):
+        #Recorre el arbol desde un nodo para obtener los indices de los vectores
+        if self.tree[nodo]['hijo1'] is None and self.tree[nodo]['hijo2'] is None:
+            #print(nodo)
+            return [nodo]
+        else:
+            nodos_finales = []
+            if self.tree[nodo]['hijo1'] is not None:
+                nodos_finales.extend(self.obtener_nodos_finales(self.tree[nodo]['hijo1']))
+            if self.tree[nodo]['hijo2'] is not None:
+                nodos_finales.extend(self.obtener_nodos_finales(self.tree[nodo]['hijo2']))
+            return nodos_finales
+    def draw_dendrogram(self):
+        # Obtener las distancias y las uniones
+      
+        linkage=[]
+        for clave in sorted(self.tree.keys(), reverse=True):
+            #print(clave)
+            if(self.tree[clave]['hijo1']is not None):
+                linkage.append([int(self.tree[clave]['hijo1']),int(self.tree[clave]['hijo2']),float(self.tree[clave]['distancia']),int(len(self.obtener_nodos_finales(clave)))])
+       
+        linkage=linkage[::-1] #invertir el orden de la array
+        print(linkage)
+       
+    
+        # Crear el dendrograma
+        plt.figure(figsize=(10, 5))
+       
+       
+        dendrogram(linkage,labels=list(range(len(linkage)+1)), leaf_rotation=90, leaf_font_size=8, orientation='top')
+        plt.xlabel('Índices de los clusters')
+        plt.ylabel('Distancia')
+        plt.title('Dendrograma '+'Distancia:'+self.distance_type)
+        plt.show()
+    
+    def obtener_indice_instancia_mas_cercana(self, vector):
+        label, dist, nodo = self.predict(vector)
+        instancias = self.obtener_nodos_finales(nodo)
+        i = None # indice instancia mas cercana
+        distancia=float("inf")
+        
+        for x in instancias:
+            if(self.grado==0):
+                nueva_dist = spatial.distance.cosine(self.vectors[x],vector)
+            else:
+                nueva_dist =  distance.minkowski(self.vectors[x],vector,self.grado)
 
-def modificar_etiquetas(labels):
-    minimo = min(labels)
-    maximo = max(labels)
-    min_original = 0
-    max_original = 47
+            if (nueva_dist<distancia):
+                distancia=nueva_dist
+                i = x
+        
+        return (label, dist, i)
+    
+    def predict(self,vector):
+        #Pre: Se da un vector
+        #Post: Devuelve el label de a que cluster pertenece
+        distancia=99999
+        nodo=None
+        for x in self.centroides.keys():
+            if(self.grado==0):
+                nueva_dist = spatial.distance.cosine(self.centroides[x],vector)
+                #nueva_dist= np.linalg.norm(self.centroides[x] - vector)
+            else:
+                nueva_dist =  distance.minkowski(self.centroides[x],vector,self.grado)
+                
+            #nueva_dist = np.linalg.norm(np.array(vector) - np.array(self.centroides[x]))
+            if (nueva_dist<distancia):
+                distancia=nueva_dist
+                nodo=x
+                label=x
+                
+        print("El punto:"+" pertenece al cluster:"+str(nodo)+" con una distancia de:"+str(distancia))
+        
+        return(label, distancia, nodo)
+    
+    def predict_multiple(self,vectors):
+        #Pre: Se da una lista de vectores
+        #Post: Devuelve un diccionario que asocia cada indice de la lista de vectores con el cluster al que pertenece
+        labels={}
+        i=0
+        for x in vectors:
+            labels[i]=self.predict(x)[0]
+            i+=1
+        return(labels)
+    def añadir_linkage(self,linkage,nodo):
+        if(self.tree[nodo]['hijo1'] is not None):
+            linkage.append([int(self.tree[nodo]['hijo1']),int(self.tree[nodo]['hijo2']),float(self.tree[nodo]['distancia']),int(len(self.obtener_nodos_finales(nodo)))])
+            linkage=self.añadir_linkage(linkage,(self.tree[nodo]['hijo1']))
+            linkage=self.añadir_linkage(linkage,(self.tree[nodo]['hijo2']))
+        return(linkage)
    
-    dict_mapeo = {}
-    for i in range(minimo,maximo):
-        dict_mapeo[min_original]= i 
-        min_original += 1
     
-    print(dict_mapeo)
-    input("jodienda")
-    etiquetas_mapeadas = [dict_mapeo[etiqueta] for etiqueta in labels]
-    
-    print(etiquetas_mapeadas)
-    input("jodienda")
-    return etiquetas_mapeadas
-    
-    valores_mapeados = min_original + ((labels - minimo) / amplitud) * (max_original - min_original)
-    return valores_mapeados
-def train_hc_model(vectores, tipo_distancia, grado_minkowski=2):
-    """
-    Método para entrenar un modelo de clustering jerárquico -> procesarCluster
-    ...
-    Parámetros
-    ----------
-    vectores : vec
-        vector de los atributos de cada uno de los documentos
-    tipo_distancia : str
-        tipo de distancia intercluster para el entrenar el modelo: ['complete','single','mean','average']
-    grado_minkowski : float
-        grado de la distancia minkowski a utilizar
-    """
+    def calcular_centroide(self,indice):
+        #Pre : Dado un indice de un nodo del arbol
+        #Post : Devuelve el centroide de sus vectores
+        cluster=self.obtener_nodos_finales(indice)
+        clusters=[]
+        for x in cluster:
+            clusters.append(self.vectors[x])
+        cluster=clusters
+        num_vectores = len(cluster)
+        num_caracteristicas = len(cluster[0])  # Suponemos que todos los vectores tienen la misma longitud
 
-    hc = hierarchical_clustering(vectores, tipo_distancia, p=grado_minkowski)
-    proc = hc.cluster() # fit()
-    proc.save() # Guardar el modelo
-    
-    return proc
+        centroide = [0] * num_caracteristicas
 
-def load_hc_model(filename):
-    """
-    Método para cargar un modelo de clustering jerárquico -> procesarCluster
-    ...
-    Parámetros
-    ----------
-    filename : str
-        path del modelo a cargar
-    """
-    return hierarchical_clustering.load(filename)
+        for vector in cluster:
+            for i in range(num_caracteristicas):
+                centroide[i] += vector[i] / num_vectores
 
-def scatter_2D(vectores, labels, y_train):
-    # Reducir las dimensiones para visualizarlas: PCA -> 2D
-    pca = PCA(n_components=2)
-    pca.fit(vectores)
-    # Cambio de base a dos dimensiones PCA 
-    x_train_PCAspace = pca.transform(vectores)
-    print('Dimensiones después de aplicar PCA: ')
-    samples = 300 # Número de instancias a dibujar
-    # Dibujar los puntos en el espacio, color: cluster, etiqueta-numérica: clase
-    # Color del punto: cluster
-    sc = plt.scatter(x_train_PCAspace[:samples,0],x_train_PCAspace[:samples,1], cmap=plt.cm.get_cmap('nipy_spectral', 10),c=list(labels.values())[:samples])
-    plt.colorbar()
-
-    # Etiqueta numérica: clase 
-    for i in range(samples):
-        plt.text(x_train_PCAspace[i,0],x_train_PCAspace[i,1], y_train[i])
-    plt.show()
-
-def scatter_3D(vectores, labels):
-    # Reducir las dimensiones para visualizarlas: PCA -> 3D
-    pca = PCA(n_components=3)
-    pca.fit(vectores)
-    # Cambio de base a dos dimensiones PCA 
-    x_train_PCAspace = pca.transform(vectores)
-    print('Dimensiones después de aplicar PCA: ')
-    samples = 300 # Número de instancias a dibujar
-    # Dibujar los puntos en el espacio, color: cluster, etiqueta-numérica: clase
-    # Color del punto: cluster
-    fig = plt.figure()
-    ax = fig.add_subplot(111, projection='3d')
-    ax.scatter(x_train_PCAspace[:samples,0],x_train_PCAspace[:samples,1], x_train_PCAspace[:samples,2], cmap=plt.cm.get_cmap('nipy_spectral', 10),c=list(labels.values())[:samples])
-    ax.set_xlabel('Eje X')
-    ax.set_xlabel('Eje Y')
-    ax.set_xlabel('Eje Z')
-    plt.show()
-
-def evaluacion_de_metricas(num_clusters, proc, X_train, y_train, cm, true_labels, pred_labels):
-    proc.graficar_dimensionalidad()
-    input("dimensionalidad")
-    proc.metrics_evaluation()
-    
-def class_to_cluster(proc, x_train, y_train):
-    true_labels = y_train[0:len(x_train)]
-    print(true_labels)
-    input("t_labels")
-    dicc_t_labels = {}
-    lista_nones = []
-    lista_t_labels = []
-    # Creando diccionario de los labels verdaderos
-    for i in range(0, len(x_train)):
-        nuevo_valor = true_labels[i]
-        if nuevo_valor is not None:
-            dicc_t_labels[i] = nuevo_valor
-            lista_t_labels.append(i)
-        else:
-            dicc_t_labels[i] = 10
-            lista_nones.append(i)
+        self.centroides[indice]=centroide
+    def cortar_arbol(self,num_clusters=4,dist_max=20):
+        #Pre: Se da el número de clusters objetivo o la distancia maxima objetivo
+        #Post: Devuelve los nodos en los que se cumplen los requisitos.
+        self.centroides={}
+        self.dist_max=dist_max
+        self.num_clusters=num_clusters
+        self.clusters=[self.nodoPadre]
+        hemosLlegado=False
+        while len(self.clusters)<num_clusters and not hemosLlegado:
+            dist=0
+            siguiente_nodo=None
+            print(self.clusters)
+            for x in self.clusters:
+                if self.tree[x]['distancia']>dist and self.tree[x]['distancia']> self.dist_max:
+                    dist=self.tree[x]['distancia']
+                    siguiente_nodo=x
+            print("El siguiente nodo:"+str(siguiente_nodo))
+            if(siguiente_nodo) is None:
+                hemosLlegado=True
+            else:
+                self.clusters.remove(siguiente_nodo)
+                self.clusters.append(self.tree[siguiente_nodo]['hijo1'])
+                self.clusters.append(self.tree[siguiente_nodo]['hijo2'])
+                
+            #print(self.clusters)
         
-    print(lista_nones)
-    lista_t_labels = [int(valor) for valor in dicc_t_labels.values()]
-    print(lista_t_labels)
-    input("")
-    print("Etiquetas reales: ", len(lista_t_labels))
-    print("Instancias sin etiquetas reales: ", len(lista_nones))
-    input("recuento")
-    t_values, t_counts = np.unique(lista_t_labels, return_counts=True)
-    print(t_values)
-    print(t_counts)
-    #[ 0  1  2  3  4  5  6  7  8  9 11 12]
-    # [532 146 101  10 193 119 353  96 115 524  64 397]
-    input("values")
-    """
-    t_labels_values_ordenados = np.array(values)[np.argsort(-np.array(counts))].tolist()
-    print(t_labels_values_ordenados)
-    input("ordenacion")
-    #[0, 9, 12, 6, 4, 1, 5, 8, 2, 7, 11, 3]
-    """
+        for x in self.clusters:
+            print("El cluster "+str(x)+" contiene estos vectores:")
+            vectores=[]
+            for y in self.obtener_nodos_finales(x):
+                vectores.append(self.vectors[y])
+            self.calcular_centroide(x)     
+        print("Los centroides son:"+str(self.centroides))
+        #self.draw_dendrogram()
+
+    def save(self):
+        #Funcion para guardar el modelo
+        filename = f"{self.distance_type}_{self.num_clusters}.pkl"
+        with open(filename, 'wb') as file:
+            pickle.dump(self, file)
+        print(f"Guardado en {filename}")
     
-    proc.cortar_arbol(num_clusters=len(t_values),dist_max=0)
-    labels = proc.predict_multiple(proc.vectors)
-    print(labels)
+    def dict_to_array(self, dict_labels, num_samples):
+        labels = [dict_labels.get(i, -1) for i in range(num_samples)]
+        return labels
+
+    def silhouette_score(self, num_clusters, dist_max):
+        self.cortar_arbol(num_clusters=num_clusters, dist_max=dist_max)
+        print("NUM CLUSTERS")
+        print(len(self.clusters))
+        X = []
+        Y = []
+        for c in self.clusters:
+            indices = self.obtener_nodos_finales(c)
+            instancias = [self.vectors[i] for i in indices]
+            X.extend(instancias)
+            Y.extend([c] * len(instancias))
+        
+        # Calcula la puntuación de la silueta
+        return silhouette_score(X, Y, metric='euclidean')
     
-    p_labels_values, p_counts = np.unique(list(labels.values()), return_counts=True)
-    print(p_labels_values)
-    print(p_counts)
-    print(proc.clusters)
-    input("labels")
-    #[5968 5969 5970 5972 5974 5975 5980 5981 5982 5983 5984 5985]
-    #[ 611    9   23   58   29  129  202  171   49  143 1459  116]
-    # Ordenar labels de los predichos para que coincidan con los verdaderos
-    """
-    p_labels_values_ordenados = np.array(values)[np.argsort(-np.array(counts))].tolist()
-    print(p_labels_values_ordenados)
-    input("ordenacion values predichos")
-    # [5984, 5968, 5980, 5981, 5983, 5975, 5985, 5972, 5982, 5974, 5970, 5969]
-    """
-    lista_p_labels = []
-    lista_p_nones = []
-    # crear lista de los labels predichos, sin nones
-    # escalado a chapters
-    for idx in range(0, len(labels)):
-        # obtenemos la etiqueta predicha de cada vector
-        nuevo_valor = labels[idx]
-        if idx is None:
-            lista_p_nones.append(idx)
-        else:
-            # guardamos su etiqueta real correspondiente
-            i = proc.clusters.index(nuevo_valor)
-            lista_p_labels.append(i)
+    def graph(self, ax, pca_, color='blue'):
+        PC_values = np.arange(pca_.n_components_) + 1
+        ax.plot(PC_values, pca_.explained_variance_ratio_, 'o-', linewidth=2, color=color)
+        plt.show()
+    
+    def graficar_dimensionalidad(self):
+        self.cortar_arbol(num_clusters=8, dist_max=0)
+        dim = max(len(vec) for vec in self.vectors)
+        print(dim)
+        #dim = 500
+        pca_ = PCA(n_components=dim)
+        pca_.fit(self.vectors)
+        print(pca_.n_components_)
+    
+        # simplemente graficar
+        fig, (ax1) = plt.subplots(1)
+        fig.suptitle('Variación de datos según la dimension')
+        self.graph(ax1, pca_)
+        
+    def etiquetas(self):
+        self.cortar_arbol(num_clusters=20, dist_max=0)
+        print("NUM CLUSTERS")
+        print(len(self.clusters))
+        X = []
+        Y = []
+        for c in self.clusters:
+            indices = self.obtener_nodos_finales(c)
+            instancias = [self.vectors[i] for i in indices]
+            X.extend(instancias)
+            Y.extend([c] * len(instancias))
+        return X, Y
+    
+    def dist_cofonetica(self):
+        # Esta métrica mide cuán bien la jerarquía de clustering representa la estructura original de tus datos
+        # Mide la correlación entre las distancias cophenéticas (distancias entre los elementos originales) 
+        # y las distancias en la jerarquía de clustering
+        linkage=[]
+        for clave in sorted(self.tree.keys(), reverse=True):
+            #print(clave)
+            if(self.tree[clave]['hijo1']is not None):
+                linkage.append([int(self.tree[clave]['hijo1']),int(self.tree[clave]['hijo2']),float(self.tree[clave]['distancia']),int(len(self.obtener_nodos_finales(clave)))])
+       
+        linkage=linkage[::-1] #invertir el orden de la array
+        print(linkage)
+        
+        #print(squareform(cophenet(linkage, pdist(self.vectors))))
+        c, coph_dists = cophenet(linkage, pdist(self.vectors))
+        print(c)
+        print(coph_dists)
+        print(len(coph_dists))
+        # c es la distancia de correlación cofenética
+        # coph_dists contiene las distancias cophenéticas entre tus datos, 
+        # estos sonla representación jerárquica de las distancias entre los elementos originales
+        input("cofonetica") 
+
+    def graficacion_siluetas(self):
+        rango_n_clusts = list(range(2,6,1))
+        for num_clusters in rango_n_clusts:
+            # creando el plot
+            fig, (ax1, ax2) = plt.subplots(1, 2)
+            fig.set_size_inches(18, 7)
             
-    print(lista_p_labels)
-    print(lista_t_labels)
-    input("confusion matrix")
-    
-    to_string = lambda x : str(x)
-    # Obtener matriz de confusión Class to clustering eval
-    #cm = confusion_matrix(np.vectorize(to_string)(lista_p_labels), np.vectorize(to_string)(lista_t_labels))
-    cm = confusion_matrix(lista_t_labels, lista_p_labels)
-    
-    """
-    cm_disp = ConfusionMatrixDisplay(cm)
-    cm_disp.plot()
-    plt.show()
-    """
-    # Mapa de calor a partir de la matriz de confusion    
-    ax = sns.heatmap(cm, annot=True, cmap="Blues", fmt="d")
+            # El 1er subplot es el plot del silhouette
+            # este puede ir de -1, 1 but in this example all
+            ax1.set_xlim([-0.1, 1])
+            # añadir separacion entre las siluetas individuales de cada cluster
+            ax1.set_ylim([0, len(self.vectors) + (num_clusters + 1) * 10])
+            print("NUM CLUSTERS")
+            self.cortar_arbol(num_clusters=num_clusters, dist_max=0)
+            X = []
+            Y = []
+            for c in self.clusters:
+                indices = self.obtener_nodos_finales(c)
+                instancias = [self.vectors[i] for i in indices]
+                X.extend(instancias)
+                Y.extend([c] * len(instancias))
+            siluet = silhouette_samples(X, Y, metric='euclidean')
+            print("For n_clusters =",num_clusters, "La media silhouette_score es :",
+            siluet,)
+            
+            y_lower = 10
+            for i in range(num_clusters):
+                # Aggregate the silhouette scores for samples belonging to
+                # cluster i, and sort them
+                ith_cluster_silhouette_values = siluet[Y == i]
 
-    plt.show()
+                ith_cluster_silhouette_values.sort()
 
-    #n_cols = [9, , , , , , , , , , , , ]
-    
-    row_ind, col_ind = linear_sum_assignment(-cm)
-    cm_nuevo = cm[:, col_ind]
+                size_cluster_i = ith_cluster_silhouette_values.shape[0]
+                y_upper = y_lower + size_cluster_i
 
+                color = cm.nipy_spectral(float(i) / num_clusters)
+                ax1.fill_betweenx(
+                    np.arange(y_lower, y_upper),
+                    0,
+                    ith_cluster_silhouette_values,
+                    facecolor=color,
+                    edgecolor=color,
+                    alpha=0.7,)
+                # Etiquetar los plots de silueta con sus numeros de clusters en el medio
+                ax1.text(-0.05, y_lower + 0.5 * size_cluster_i, str(i))
 
-    # Crear una nueva matriz de confusión reasignando las columnas
-    #cm_nuevo = np.array([cm[:, mapeo[label]] for label in values])
-    
-    ax = sns.heatmap(cm_nuevo, annot=True, cmap="Blues", fmt="d")
-    
-    plt.show()
-    
-    return cm_nuevo, lista_t_labels, lista_p_labels
+                # Calcular el nuevo y_lower para el siguiente plot
+                y_lower = y_upper + 10  # 10 for the 0 samples
 
-def calcular_silueta_para(lista_num_clusters, proc, dist_max=0):
-    resultados = []
-    for n in lista_num_clusters:
-        sil = proc.silhouette_score(n, dist_max)
-        resultados.append((n, sil))
+            ax1.set_title("La gŕafica de silueta para varios clusters")
+            ax1.set_xlabel("Los valores de los coeficientes de silueta")
+            ax1.set_ylabel("Etiqueta cluster")
+
+            # La linea vertical para el avg silueta
+            ax1.axvline(x=silhouette_avg, color="red", linestyle="--")
+
+            ax1.set_yticks([]) 
+            ax1.set_xticks([-0.1, 0, 0.2, 0.4, 0.6, 0.8, 1])
+            
+    def etiquetas(self):
+        #self.cortar_arbol(num_clusters=10, dist_max=dist_max)
+        print("NUM CLUSTERS")
+        print(len(self.clusters))
+        input("clusts")
+        X = []
+        Y = []
+        for c in self.clusters:
+            indices = self.obtener_nodos_finales(c)
+            instancias = [self.vectors[i] for i in indices]
+            X.extend(instancias)
+            Y.extend([c] * len(instancias))
         
-    return resultados
-
-def graficar_siluetas(siluetas):
-        # Representamos los resultados en una gráfica de barras
-        fig, ax = plt.subplots(figsize=(5,2))
-        ax.set_xlabel('num clusters')
-        ax.set_ylabel('Silhouette score')
-
-        x = [silueta[0] for silueta in siluetas]
-        y = [silueta[1] for silueta in siluetas]
-        plt.bar(x, y, align='center', color='#007acc')
-        plt.show()
-
-def graficar_siluetas(siluetas1, siluetas2):
-        # Representamos los resultados en un gráfico conjunto
-
-        x1 = [silueta[0] for silueta in siluetas1]
-        y1 = [silueta[1] for silueta in siluetas1]
+        # Calcula la puntuación de la silueta
+        return X, Y
+class hierarchical_clustering:
+    def __init__(self, vectors, inter_distance_type,p=2):
+        #CONSTRUCTORA DE LA CLASE DE ENTRENAMIENTO
+        self.iters=0
+        self.grado=p
+        self.vectors = vectors
+        self.tree={}
+        self.centroides={}
+        self.distance_type = inter_distance_type
+        if (self.distance_type=="average"):
+            for i in range(len(vectors)):
+             self.centroides[i]=self.vectors[i]
+        self.clusters = [i for i in range(len(vectors))]
         
-        x2 = [silueta[0] for silueta in siluetas2]
-        y2 = [silueta[1] for silueta in siluetas2]
+        #self.distances = [[self.distance(vectors[i], vectors[j]) for j in range(len(vectors))] for i in range(len(vectors))]
+    @classmethod
+    def load(cls, filename):
+        #Función para cargar el modelo
+        with open(filename, 'rb') as file:
+            obj = pickle.load(file)
+        print(f"Cargado desde {filename}")
+        return obj
+    def calcular_centroide(self,indice):
+        #Pre:Dado un indice obtiene todos los vectores que contiene
+        #Post:Devuelve el centroide asociado a los vectores pertenecientes al cluster
+        cluster=self.clusters_ind[indice]
+        clusters=[]
+        for x in cluster:
+            clusters.append(self.vectors[x])
+        cluster=clusters
+        num_vectores = len(cluster)
+        num_caracteristicas = len(cluster[0])  # Suponemos que todos los vectores tienen la misma longitud
+
+        centroide = [0] * num_caracteristicas
+
+        for vector in cluster:
+            for i in range(num_caracteristicas):
+                centroide[i] += vector[i] / num_vectores
+
+        self.centroides[indice]=centroide
+    def calcular_distancias_NuevoNodo(self,num_nodos):
+        #Pre:Se le aporta el nodo recien creado
+        #Post:Actualiza la distancia al resto de clusters posibles
+        distancia=9999
+        for x in self.clusters:
+            #print("Se esta recalculando distancia de "+ str(x)+" y " + str(num_nodos))
+            if(self.distance_type!="average"):
+                distancia=self.distancia_intracluster(self.clusters_ind[num_nodos],self.clusters_ind[x])
+            self.distancias[num_nodos,x]=distancia
+            self.distancias[x,num_nodos]=distancia
+        return
+    def actualizar_arbol(self, nodo1, nodo2, distancia):
+        #Pre:Dado los hijos y la distancia actualiza el arbol
+        #Post:El arbol se verá incrementado con un nuevo nodo
+        num_nodos = len(self.vectors)+self.iters 
+        nueva_distancia =  0
+        self.clusters_ind[num_nodos] = self.clusters_ind.get(nodo1, []) + self.clusters_ind.get(nodo2, [])
+        print(self.clusters_ind[num_nodos])
+        self.clusters.remove(nodo1)
+        self.clusters.remove(nodo2)
+        self.calcular_distancias_NuevoNodo(num_nodos)
+        self.clusters.append(num_nodos)
         
-        plt.plot(x1, y1, label='implementacion', color='blue')
-        plt.plot(x2, y2, label='scipy', color='red')
-
-        # Personalizar el gráfico
-        plt.title('Comparación de siluetas')
-        plt.xlabel('num clusters')
-        plt.ylabel('Silhouette score')
-        plt.legend()  # Muestra las etiquetas en el gráfico
-        # Mostrar el gráfico
-        plt.grid(True)
-        plt.show()
         
-# Algoritmo de scipy
-def train_modelo_scipy(vectores):      
-    distances = pdist(vectores, metric='minkowski', p=7.5)
-    return linkage(distances, method='complete')
+        # Crear el nuevo nodo
+        nuevo_nodo = {
+            'hijo1': nodo1,
+            'hijo2': nodo2,
+            'distancia': distancia,
+            'iteracion': self.iters #ESTO PARA NUM CLUSTERS!!
+            #'padre':None,
+            #'vector': None  # Aquí deberías definir el vector del nuevo nodo si es necesario
+        }
+        print("nuevo nodo" + str(nuevo_nodo))
+        # Añadir el nuevo nodo al árbol
+        self.tree[num_nodos] = nuevo_nodo
+        if(self.distance_type=="average"):
+            self.centroides.pop(nodo1)
+            self.centroides.pop(nodo2)
+            self.calcular_centroide(num_nodos)
 
-def calcular_silueta_scipy_para(lista_num_clusters, Z, vectores, criterion='maxclust'):
-    resultados = []
-    for n in lista_num_clusters:
-        labels = fcluster(Z, t=n, criterion=criterion)
-        sil = silhouette_score(vectores, labels, metric='euclidean')
-        resultados.append((n, sil))
+        # Incrementar el contador de iteraciones
+
+        return num_nodos
+
+    def generar_diccionario(self):
+        #Genera la base del arbol puesto que esto dará el indice para acceder a los vectores
+        resultado = {}
         
-    return resultados 
-# MAIN
-def main():
-    train = pd.read_csv(train_file)
-    train['gs_text34'] = train['gs_text34'].str.lower()
-    # Realizamos un encoding de las clases de las instancias en función de un mapeo definido: Pneumonia -> 0; Stroke -> 1...
-    train = mapeo_de_labels(train, 'gs_text34') # Añade la columna 'Clases'
-    x_train = train['open_response']
-    print(train)
-    y_train = train['Clases']
-    print(y_train.unique())
-    plt.bar(y_train.value_counts().index, y_train.value_counts())
-    plt.show()
-    input("valores unicos")
+        for i, array in enumerate(self.vectors):
+            id_unico = i  
+            resultado[id_unico] = {'hijo1': None, 'hijo2': None, 'distancia': 0, 'iteracion': -1}
+        return resultado
     
-    #print(x_train.head())
-    #print(y_train.head())
+    def generar_distancias(self):
+        #Pre dado los vectores
+        #Post genera las tuplas de distancias entre todos los puntos para evitar recalcularlas
+        n = len(self.vectors)
+        vectores=[np.array(vec) for vec in self.vectors]
+        distancias = {}
+        self.clusters_ind={}
+        for i in range(n):
+            self.clusters_ind[i]=[i]
+            for j in range(i+1, n):
+                distancia =  distance.minkowski(vectores[i],vectores[j],self.grado)
+                #distancia = np.linalg.norm(vectores[i] - vectores[j])
+                distancias[(i, j)] = distancia
+                distancias[(j, i)] = distancia
+        return distancias
     
-    model_file = 'my_doc2vec_n50.model'
-    # Obtenemos la vectorizacion de los documentos -> [(index, vector)]
-    # Entrenamos el modelo
-    #train_docModel(pd.read_csv(train_file)['open_response'], model_file)
+    ##Aqui se hacen las distancias
+    def mean_link(self,cluster1, cluster2):
+        #Calcula la distancia mean
+        total_distancia = 0
+        num_pares = 0
+        for punto1 in cluster1:
+            for punto2 in cluster2:
+                total_distancia += self.distancias[(punto1, punto2)]
+                num_pares += 1
+        return total_distancia / num_pares
     
-    input("primer train docModel")
-    docModel = load_docModel(model_file)
-    x_train = list(vec_docEmbeddings(x_train, docModel))
-    vectores = x_train
-    vectores = vectores[0:2000] # 2000 instancias para el entrenamiento
+    def single_link(self,cluster1, cluster2):
+        #Calcula la distancia single
+        min_distancia = float('inf')
+        for punto1 in cluster1:
+            for punto2 in cluster2:
+                distancia = self.distancias[(punto1, punto2)]
+                if distancia < min_distancia:
+                    min_distancia = distancia
+        return min_distancia
     
-    #proc = train_hc_model(vectores, 'complete', 2)
-    input("cargar modelo hc")
-    proc = load_hc_model("complete_4.pkl") # <---- n50, 2000
-    """
-    proc.cortar_arbol(num_clusters=13,dist_max=0)
-    print(proc.clusters)
-    print(len(proc.clusters))
-    input("clusts")
-    #proc.dist_cofonetica()
-    #proc.graficacion_siluetas()
-    """
+    def complete_link(self,cluster1, cluster2):
+        #Calcula la distancia complete
+        max_distancia = 0
+        for punto1 in cluster1:
+            for punto2 in cluster2:
+                distancia = self.distancias[(punto1, punto2)]
+                if distancia > max_distancia:
+                    max_distancia = distancia
+        return max_distancia
+    
+    def average_link(self,cluster1, cluster2):
+        #Calcula la distancia avg
+        total_distancia = 0
+        num_pares = 0
+        for punto1 in cluster1:
+            for punto2 in cluster2:
+                total_distancia += self.distancias[(punto1, punto2)]
+                num_pares += 1
+        return total_distancia / num_pares
+    def mean_link(self):
+        centroides = list(self.centroides.keys())
+        coordenadas = list(self.centroides.values())
+        
+        # Calcula todas las distancias entre pares de centroides
+        
+        distancia_minima = float('inf')
+        centroides_mas_cercanos = (None, None)
+        
+        # Encuentra los centroides más cercanos
+        for i in range(len(centroides)):
+            for j in range(i + 1, len(centroides)):
+                distancia_actual = np.linalg.norm(np.array(coordenadas[i]) - np.array(coordenadas[j]))
+                if distancia_actual < distancia_minima:
+                    distancia_minima = distancia_actual
+                    centroides_mas_cercanos = (centroides[i], centroides[j])
+                    centroide1=centroides[i]
+                    centroide2=centroides[j]
+        
+    
+        return centroide1,centroide2, distancia_minima
+        
 
-    #proc.cortar_arbol(num_clusters=10,dist_max=0)
-    """
-    labels = proc.predict_multiple(proc.vectors)
-    print(labels)
-    print(len(labels))
-    print(min(labels), max(labels))
-    values, counts = np.unique(labels, return_counts=True)
-    print(values)
-    print(counts)
-    """
-    #print(y_train[0:2999])
-    input("class cluster")
-    cm, t_labels, p_labels = class_to_cluster(proc, vectores, y_train)
-    # Dibujar arbol completo
-    proc.draw_dendrogram()
-    evaluacion_de_metricas(num_clusters=13, proc=proc, X_train=x_train, y_train=y_train, cm=cm, true_labels=t_labels, pred_labels=p_labels)
-    
-    
-    # Cortar el arbol en un numero determinado de clusters
-    #proc.cortar_arbol(num_clusters=10,dist_max=0)
-    labels = proc.predict_multiple(vectores)
-    
-    ## COMPROBAR DISTANCIAS DE NUEVOS DOCUMENTOS ##########
-    nuevo_vector = list(vec_docEmbeddings(["Zakila isogailua sartu no en"], docModel))[0]
-    print(nuevo_vector)
-    proc.cortar_arbol(num_clusters=10,dist_max=0)
-    
-    # Obtener labels por cada vector -> diccionario
-    labels = proc.predict(nuevo_vector)
-    print(labels)
-    input("labels")
-    
-    
-    
-    ## SILUETA ##########
-    # num_clusters = [i for i in range(2, 51)]
-    # siluetas = calcular_silueta_para(num_clusters, proc)  
-    # #graficar_siluetas(siluetas)
-    # 
-    # Z = train_modelo_scipy(vectores)
-    # siluetas_scipy = calcular_silueta_scipy_para(num_clusters, Z, vectores)
-    # #graficar_siluetas(siluetas_scipy)
-    # 
-    # graficar_siluetas(siluetas, siluetas_scipy)
+    def distancia_intracluster(self,ind_vect_cluster1,ind_vect_cluster2):
+        #Redirige para saber que tipo de disttancia intracluster usar
+        #'single','complete','average','mean'
+        if(self.distance_type=="single"):
+            distancia=self.single_link(ind_vect_cluster1,ind_vect_cluster2)
+        elif(self.distance_type=="mean"):
+            distancia=self.average_link(ind_vect_cluster1,ind_vect_cluster2)
+        elif(self.distance_type=="average"):
+            #distancia=self.mean_link(ind_vect_cluster1,ind_vect_cluster2)
 
+            print("Esto no se deberia ejecutar nunca puesto que se trata en otro momento")
+        else:
+            distancia=self.complete_link(ind_vect_cluster1,ind_vect_cluster2)
+        #print("Distancia entre cluster:"+str(ind_vect_cluster1)+" y cluster:"+str(ind_vect_cluster2)+" :"+str(distancia))
+        
+        return(distancia)
     
+    def encontrar_clusters_mas_cercanos(self):
+        #Pre: Tenemos una lista de cluster mayor que 1
+        #Post: Devuelve los dos nodos con distancia intergrupal menor para posteriormente unirlos llamando a la función añadir_arbol
+        if(self.distance_type=="average"):
+           indice_cluster1, indice_cluster2,distancia_minima=self.mean_link()
+        else:
+            distancia_minima = float('inf')
+            indice_cluster1 = None
+            indice_cluster2 = None
+                
+            for i in range(len(self.clusters)):
+                cluster1 = self.clusters[i]
+                vectores_cluster1=self.clusters_ind[cluster1]
+                for j in range(i + 1, len(self.clusters)):
+                    
+                    cluster2 = self.clusters[j]
+                    
+                    if ((self.clusters[i],self.clusters[j]) not in self.distancias):
+                        
+                        vectores_cluster2=self.clusters_ind[cluster2]
+                        
+                        distancia = self.distancia_intracluster(vectores_cluster1, vectores_cluster2)
+                    else:
+                        #print("Distancia precalculada")
+                        distancia=self.distancias[(self.clusters[i],self.clusters[j])]
+                    
+                    if distancia < distancia_minima:
+                        distancia_minima = distancia
+                        indice_cluster1 = cluster1
+                        indice_cluster2 = cluster2
+                    elif distancia == distancia_minima:
+                        if random.choice([True, False]):
+                            indice_cluster1 = cluster1
+                            indice_cluster2 = cluster2
+            print("Los nodos más cercanos son:"+str(indice_cluster1)+" y "+str(indice_cluster2))
+            
+        return indice_cluster1, indice_cluster2,distancia_minima
+
+         
+    def cluster(self):
+        #Funcion que inicia el entrenamiento, dado una lista de vectores esta se ira agrupando hasta quedar solo 1 un cluster, se verá reflejado en el arbol y podra recorrerse con una clase auxiliar
+        if self.iters == 0:
+            self.tree = self.generar_diccionario()
+            self.distancias=self.generar_distancias()
+              
+        while len(self.clusters) > 1:
+            #nodo1, nodo2 = self.encontrar_nodos_mas_cercanos()
+            #self.actualizar_arbol(nodo1, nodo2)
+            nodo1,nodo2,distancia=self.encontrar_clusters_mas_cercanos()
+            self.actualizar_arbol(nodo1,nodo2,distancia)
+            self.iters += 1
+        proc=procesarCluster(self.vectors,self.tree,distance_type=self.distance_type,p=2)
+        
+        return proc
+
+    @staticmethod
+    def load(filename):
+        with open(filename, 'rb') as file:
+            return pickle.load(file)
+
+
 if __name__ == "__main__":
-    main()
-    exit(0)
+    help() 
