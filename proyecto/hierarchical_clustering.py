@@ -133,7 +133,8 @@ class procesarCluster():
         labels={}
         i=0
         for x in vectors:
-            labels[i]=self.predict(x)[0]
+            label, dist, nodo = self.predict(x)
+            labels[i] = label
             i+=1
         return(labels)
     def añadir_linkage(self,linkage,nodo):

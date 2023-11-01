@@ -1,4 +1,5 @@
 from gensim.utils import simple_preprocess
+from gensim.parsing.preprocessing import preprocess_string
 from gensim.models.doc2vec import Doc2Vec
 import gensim.downloader
 import smart_open
@@ -11,20 +12,31 @@ import pandas as pd
 
 import os
 
-def preprocesado(texto):
+def preprocesado(documento):
     # PRE: Un texto
-    # POST: Tockens del texto preprocesado
-    return simple_preprocess(texto)
+    # POST: Tokens del texto preprocesado
+    
+    tokens = simple_preprocess(documento)
+    #tokens = preprocess_string(texto)
+    
+    return tokens
 
-def train_docModel(texts, model_file):
+def train_docModel(documentos, model_file):
     # Inicializamos y entrenamos un modelo Doc2Vec
     #documents = [TaggedDocument(doc, [i]) for i, doc in enumerate(common_texts)]
-    documents = [TaggedDocument(preprocesado(doc), [i]) for i, doc in enumerate(texts)]
+    # Preprocesa tus documentos
+    documentos_preprocesados = [preprocesado(doc) for doc in documentos]
 
-    model = Doc2Vec(documents, vector_size=100, window=2, min_count=1, workers=4)
+    # Crea objetos TaggedDocument
+    documentos_tokenizados = [TaggedDocument(words=words, tags=[str(i)]) for i, words in enumerate(documentos_preprocesados)]
 
+    # Entrena el modelo Doc2Vec
+    modelo_doc2vec = Doc2Vec(vector_size=100, window=2, min_count=1, workers=4, epochs=20)
+    modelo_doc2vec.build_vocab(documentos_tokenizados)
+    modelo_doc2vec.train(documentos_tokenizados, total_examples=modelo_doc2vec.corpus_count, epochs=modelo_doc2vec.epochs)
+    
     # Guardamos el modelo
-    model.save(model_file)
+    modelo_doc2vec.save(model_file)
 
 def load_docModel(model_file):
     # Cargamos el modelo

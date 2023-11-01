@@ -18,7 +18,7 @@ from sklearn.metrics import silhouette_score
 
 # VARIABLES GLOBALES
 data_dir = "."
-doc2vec_model_file = 'my_doc2vec_n50.model'
+doc2vec_model_file = 'my_doc2vec_n100.model'
 train_file = 'verbalAutopsy_train.csv'
 test_file = 'verbalAutopsy_test.csv'
 
@@ -171,8 +171,8 @@ def graficar_distancias_documentos(x, y, texts1, texts2):
         plt.text(0, i, f'{t1}\n{t2}', color='black', va='center')
 
     # Personaliza el gráfico
-    plt.xlabel('Indice del texto del test')
-    plt.ylabel('Distancia al cluster más cercano')
+    plt.ylabel('Indice del texto del test')
+    plt.xlabel('Distancia al cluster más cercano')
     plt.title('Estudio de la distancia de documentos a sus respectivos clusters')
     plt.xticks(rotation=45)  # Rota las etiquetas del eje x para mayor legibilidad
 
@@ -283,15 +283,15 @@ def main():
     
     # Obtenemos la vectorizacion de los documentos -> [(index, vector)]
     # Entrenamos el modelo
-    # train_docModel(pd.read_csv(train_file)['open_response'], model_file)
+    #train_docModel(pd.read_csv(train_file)['open_response'], doc2vec_model_file)
     docModel = load_docModel(doc2vec_model_file)
     x_train = list(vec_docEmbeddings(x_train, docModel))
     vectores = x_train
-    vectores = vectores[0:2999] # 3000 instancias para el entrenamiento
+    vectores = vectores[0:999] # 1000 instancias para el entrenamiento
     
     #proc = train_hc_model(vectores, 'complete', 2)
     
-    proc = load_hc_model("complete_4_n50_3000_2grado.pkl")
+    proc = load_hc_model("complete_4_n100_1000_2grado.pkl")
     
     # Dibujar arbol completo
     #proc.draw_dendrogram()
@@ -301,23 +301,20 @@ def main():
     
     # Obtener labels por cada vector
     labels = proc.predict_multiple(vectores)
-    
+
     
     ## PRUEBAS
-    
     ## N ÓPTIMO Doc2Vec #################################################
     #calcular_n_optimo_doc2vec()
     
     ## DISTANCIAS A DOCUMENTOS ##########################################
     test = [
         "the caese of death is pneumonia",
-        "my daughter while playing slipped and fell down in the sump more water was there at that time hence she plunged in and died nobody has seen her felling in to that other wise this would have not happened",
-        "aba bab bb aa aa bha",
-        "child was absolutely fine he had no problem he was taken to hospital when he felt some problem after taking poison poison was given by father",
-        "the baby died in the womb because mother had malaria",
-        "ppppppppppp pppppppppppp pppppppppppp ppppppppppppp ppppppppppppppppppppppppppppppppppppppppppppp",
-        "the deceased died in a road accident",
-        "the deceased was bitten by a snake and died"
+        "the deceased had fallen off a bike and died",
+        "the deceased had severe anemia",
+        "the deceased was killed by a sharp weapon",
+        "aaa aaab aba abbba bbbbbb",
+        "o xd"
     ]
     obtener_train_mas_cercano(test, train, proc, docModel)
        
