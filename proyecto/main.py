@@ -33,15 +33,14 @@ def mapeo_de_labels(datos_df, columna):
         "1":    ["Leukemia/Lymphomas", "Colorectal Cancer", "Lung Cancer", "Cervical Cancer", "Breast Cancer", "Stomach Cancer", "Prostate Cancer", "Esophageal Cancer", "Other Cancers"],
         "2":    ["Diabetes"],
         "3":    ["Epilepsy"],
-        "4":    ["Stroke"],
-        "5":    ["Acute Myocardial Infarction"],
-        "6":    ["Pneumonia", "Asthma", "COPD"],
-        "7":    ["Cirrhosis", "Other Digestive Diseases"],
-        "8":    ["Renal Failure"],
-        "9":    ["Preterm Delivery", "Stillbirth", "Maternal", "Birth Asphyxia"],
-        "10":   ["Congenital Malformations"],
-        "11":   ["Bite of Venomous Animal", "Poisonings"],
-        "12":   ["Road Traffic", "Falls", "Homicide", "Fires", "Drowning", "Suicide", "Violent Death", "Other injuries"]
+        "4":    ["Stroke", "Acute Myocardial Infarction"],
+        "5":    ["Pneumonia", "Asthma", "COPD"],
+        "6":    ["Cirrhosis", "Other Digestive Diseases"],
+        "7":    ["Renal Failure"],
+        "8":    ["Preterm Delivery", "Stillbirth", "Maternal", "Birth Asphyxia"],
+        "9":    ["Congenital Malformations"],
+        "10":   ["Bite of Venomous Animal", "Poisonings"],
+        "11":   ["Road Traffic", "Falls", "Homicide", "Fires", "Drowning", "Suicide", "Violent Death", "Other injuries"]
     }
     # Convertir el diccionario de mapeo original a minúsculas
     mapeo = {etiqueta.lower(): [clase.lower() for clase in clases] for etiqueta, clases in mapeo.items()}
@@ -146,8 +145,58 @@ def scatter_3D(vectores, labels):
     ax.set_xlabel('Eje Z')
     plt.show()
 
+def graficar_cofonetica(c_datos):
+    plt.hist(c_datos, bins=10, color='blue', edgecolor='black')
+    plt.xlabel('Valores')
+    plt.ylabel('Frecuencia')
+    plt.title('Histograma de Valores')
+    plt.show()
+
+def graficar_dimensionalidad(proc):
+    def graph(ax, pca_, color, n95, n99):
+        PC_values = np.arange(pca_.n_components_) + 1
+        ax.plot(PC_values, pca_.explained_variance_ratio_, 'o-', linewidth=2, color=color)
+        
+        # Marcar valores n95 y n99 en el eje x con líneas punteadas
+        ax.axvline(x=n95, color="orange", linestyle="--", label="95%")
+        ax.axvline(x=n99, color="red", linestyle="--", label="99%")
+        
+        # Agregar una leyenda
+        ax.legend()
+        
+        plt.show()
+        
+    proc.cortar_arbol(num_clusters=8, dist_max=0)
+    dim = max(len(vec) for vec in proc.vectors)
+    print(dim)
+    #dim = 500
+    pca_ = PCA(n_components=dim)
+    pca_.fit(proc.vectors)
+    print(pca_.n_components_)
+    pca__= PCA()
+    pca__.fit(proc.vectors)
+
+    # Calcula la varianza explicada acumulada
+    cumulative_variance_ratio = np.cumsum(pca__.explained_variance_ratio_)
+    # Encuentra el número de componentes que preservan al menos el 95% de la varianza
+    n_components_95 = np.argmax(cumulative_variance_ratio >= 0.95) + 1
+    # Encuentra el número de componentes que preservan al menos el 99% de la varianza
+    n_components_99 = np.argmax(cumulative_variance_ratio >= 0.99) + 1
+    
+    # simplemente graficar
+    fig, (ax1) = plt.subplots(1)
+    fig.suptitle('Variación de datos según la dimension')
+    
+    graph(ax1, pca_, color='blue', n95=n_components_95, n99=n_components_99)
+    print(dim)
+    print(n_components_95)
+    print(n_components_99)
+    
+    return (dim, n_components_95, n_components_99)
+
+
 def evaluacion_de_metricas(num_clusters, proc, X_train, y_train, cm, true_labels, pred_labels):
-    proc.graficar_dimensionalidad()
+    graficar_dimensionalidad(proc)
     input("dimensionalidad")
     proc.metrics_evaluation()
     
@@ -165,7 +214,6 @@ def class_to_cluster(proc, x_train, y_train):
             dicc_t_labels[i] = nuevo_valor
             lista_t_labels.append(i)
         else:
-            dicc_t_labels[i] = 10
             lista_nones.append(i)
         
     print(lista_nones)
@@ -181,12 +229,12 @@ def class_to_cluster(proc, x_train, y_train):
     #[ 0  1  2  3  4  5  6  7  8  9 11 12]
     # [532 146 101  10 193 119 353  96 115 524  64 397]
     input("values")
-    """
-    t_labels_values_ordenados = np.array(values)[np.argsort(-np.array(counts))].tolist()
+    
+    t_labels_values_ordenados = np.array(t_values)[np.argsort(-np.array(t_counts))].tolist()
     print(t_labels_values_ordenados)
     input("ordenacion")
     #[0, 9, 12, 6, 4, 1, 5, 8, 2, 7, 11, 3]
-    """
+    
     
     proc.cortar_arbol(num_clusters=len(t_values),dist_max=0)
     labels = proc.predict_multiple(proc.vectors)
@@ -200,12 +248,12 @@ def class_to_cluster(proc, x_train, y_train):
     #[5968 5969 5970 5972 5974 5975 5980 5981 5982 5983 5984 5985]
     #[ 611    9   23   58   29  129  202  171   49  143 1459  116]
     # Ordenar labels de los predichos para que coincidan con los verdaderos
-    """
-    p_labels_values_ordenados = np.array(values)[np.argsort(-np.array(counts))].tolist()
+    
+    p_labels_values_ordenados = np.array(p_labels_values)[np.argsort(-np.array(p_counts))].tolist()
     print(p_labels_values_ordenados)
     input("ordenacion values predichos")
     # [5984, 5968, 5980, 5981, 5983, 5975, 5985, 5972, 5982, 5974, 5970, 5969]
-    """
+    
     lista_p_labels = []
     lista_p_nones = []
     # crear lista de los labels predichos, sin nones
@@ -213,11 +261,11 @@ def class_to_cluster(proc, x_train, y_train):
     for idx in range(0, len(labels)):
         # obtenemos la etiqueta predicha de cada vector
         nuevo_valor = labels[idx]
-        if idx is None:
+        if idx in lista_nones:
             lista_p_nones.append(idx)
         else:
             # guardamos su etiqueta real correspondiente
-            i = p_labels_values.tolist().index(nuevo_valor) 
+            i = p_labels_values_ordenados.index(nuevo_valor) 
             #i = proc.clusters.index(nuevo_valor)
             lista_p_labels.append(i)
             
@@ -240,20 +288,32 @@ def class_to_cluster(proc, x_train, y_train):
 
     plt.show()
 
-    #n_cols = [9, , , , , , , , , , , , ]
     
     row_ind, col_ind = linear_sum_assignment(-cm)
-    cm_nuevo = cm[:, col_ind]
-
+    new_cm = cm[:, col_ind]
+    
 
     # Crear una nueva matriz de confusión reasignando las columnas
     #cm_nuevo = np.array([cm[:, mapeo[label]] for label in values])
     
-    ax = sns.heatmap(cm_nuevo, annot=True, cmap="Blues", fmt="d")
-    
+    ax = sns.heatmap(new_cm, annot=True, cmap="Blues", fmt="d")
+    ax.set_xlabel("Predicción (cluster)")
+    ax.set_ylabel("Verdadero")
+        
     plt.show()
     
-    return cm_nuevo, lista_t_labels, lista_p_labels
+    total=0
+    for i in range(len(new_cm)):
+        sumaTot=0
+        for j in range(len(new_cm)):
+            sumaTot=new_cm[j][i]+sumaTot
+        error=1-(new_cm[i][i])/sumaTot
+        print("El error del cluster "+str(i)+" es de:"+str(error))
+        total=total+error
+    error_tot=total/(len(new_cm))
+    print("El error promedio es:"+str(error_tot))
+    
+    return new_cm, lista_t_labels, lista_p_labels
 
 def calcular_silueta_para(lista_num_clusters, proc, dist_max=0):
     resultados = []
@@ -325,7 +385,7 @@ def main():
     #print(x_train.head())
     #print(y_train.head())
     
-    model_file = 'oier_prueba_modelo'
+    model_file = 'doc2model.model'
     # Obtenemos la vectorizacion de los documentos -> [(index, vector)]
     # Entrenamos el modelo
     #train_docModel(pd.read_csv(train_file)['open_response'], model_file)
@@ -362,8 +422,12 @@ def main():
     input("class cluster")
     cm, t_labels, p_labels = class_to_cluster(proc, vectores, y_train)
     # Dibujar arbol completo
-    proc.draw_dendrogram()
-    evaluacion_de_metricas(num_clusters=13, proc=proc, X_train=x_train, y_train=y_train, cm=cm, true_labels=t_labels, pred_labels=p_labels)
+    #proc.draw_dendrogram()
+    input("cofonetica")
+    c_datos = proc.dist_cofonetica()
+    input("dims")
+    graficar_dimensionalidad(proc)
+    evaluacion_de_metricas(num_clusters=12, proc=proc, X_train=x_train, y_train=y_train, cm=cm, true_labels=t_labels, pred_labels=p_labels)
     
     
     # Cortar el arbol en un numero determinado de clusters
