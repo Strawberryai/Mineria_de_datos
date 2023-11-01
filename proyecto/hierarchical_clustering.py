@@ -89,6 +89,25 @@ class procesarCluster():
         plt.ylabel('Distancia')
         plt.title('Dendrograma '+'Distancia:'+self.distance_type)
         plt.show()
+    
+    def obtener_indice_instancia_mas_cercana(self, vector):
+        label, dist, nodo = self.predict(vector)
+        instancias = self.obtener_nodos_finales(nodo)
+        i = None # indice instancia mas cercana
+        distancia=float("inf")
+        
+        for x in instancias:
+            if(self.grado==0):
+                nueva_dist = spatial.distance.cosine(self.vectors[x],vector)
+            else:
+                nueva_dist =  distance.minkowski(self.vectors[x],vector,self.grado)
+
+            if (nueva_dist<distancia):
+                distancia=nueva_dist
+                i = x
+        
+        return (label, dist, i)
+    
     def predict(self,vector):
         #Pre: Se da un vector
         #Post: Devuelve el label de a que cluster pertenece
@@ -207,60 +226,33 @@ class procesarCluster():
         # Calcula la puntuación de la silueta
         return silhouette_score(X, Y, metric='euclidean')
     
-    def graph(self, ax, pca_, color='blue'):
-        PC_values = np.arange(pca_.n_components_) + 1
-        ax.plot(PC_values, pca_.explained_variance_ratio_, 'o-', linewidth=2, color=color)
-        plt.show()
-    
-    def graficar_dimensionalidad(self):
-        self.cortar_arbol(num_clusters=8, dist_max=0)
-        dim = max(len(vec) for vec in self.vectors)
-        print(dim)
-        #dim = 500
-        pca_ = PCA(n_components=dim)
-        pca_.fit(self.vectors)
-        print(pca_.n_components_)
-    
-        # simplemente graficar
-        fig, (ax1) = plt.subplots(1)
-        fig.suptitle('Variación de datos según la dimension')
-        self.graph(ax1, pca_)
         
-    def etiquetas(self):
-        self.cortar_arbol(num_clusters=20, dist_max=0)
-        print("NUM CLUSTERS")
-        print(len(self.clusters))
-        X = []
-        Y = []
-        for c in self.clusters:
-            indices = self.obtener_nodos_finales(c)
-            instancias = [self.vectors[i] for i in indices]
-            X.extend(instancias)
-            Y.extend([c] * len(instancias))
-        return X, Y
-    
     def dist_cofonetica(self):
         # Esta métrica mide cuán bien la jerarquía de clustering representa la estructura original de tus datos
         # Mide la correlación entre las distancias cophenéticas (distancias entre los elementos originales) 
         # y las distancias en la jerarquía de clustering
-        linkage=[]
-        for clave in sorted(self.tree.keys(), reverse=True):
-            #print(clave)
-            if(self.tree[clave]['hijo1']is not None):
-                linkage.append([int(self.tree[clave]['hijo1']),int(self.tree[clave]['hijo2']),float(self.tree[clave]['distancia']),int(len(self.obtener_nodos_finales(clave)))])
-       
-        linkage=linkage[::-1] #invertir el orden de la array
-        print(linkage)
+        c_datos = {}
         
-        #print(squareform(cophenet(linkage, pdist(self.vectors))))
-        c, coph_dists = cophenet(linkage, pdist(self.vectors))
-        print(c)
-        print(coph_dists)
-        print(len(coph_dists))
+        for link in ['complete','single','mean','average']:
+            linkage=[]
+            for clave in sorted(self.tree.keys(), reverse=True):
+                #print(clave)
+                if(self.tree[clave]['hijo1']is not None):
+                    linkage.append([int(self.tree[clave]['hijo1']),int(self.tree[clave]['hijo2']),float(self.tree[clave]['distancia']),int(len(self.obtener_nodos_finales(clave)))])
+        
+            linkage=linkage[::-1] #invertir el orden de la array
+            print(linkage)
+        
+            c, coph_dists = cophenet(linkage, pdist(self.vectors))
+            print(c)
+            print(coph_dists)
+            print(len(coph_dists))
+            c_datos[link]= c
+        
         # c es la distancia de correlación cofenética
         # coph_dists contiene las distancias cophenéticas entre tus datos, 
         # estos sonla representación jerárquica de las distancias entre los elementos originales
-        input("cofonetica") 
+        return c_datos
 
     def graficacion_siluetas(self):
         rango_n_clusts = list(range(2,6,1))
@@ -316,26 +308,42 @@ class procesarCluster():
             ax1.set_xlabel("Los valores de los coeficientes de silueta")
             ax1.set_ylabel("Etiqueta cluster")
 
-            # The vertical line for average silhouette score of all the values
+            # La linea vertical para el avg silueta
             ax1.axvline(x=silhouette_avg, color="red", linestyle="--")
 
-            ax1.set_yticks([])  # Clear the yaxis labels / ticks
+            ax1.set_yticks([]) 
             ax1.set_xticks([-0.1, 0, 0.2, 0.4, 0.6, 0.8, 1])
-    def etiquetas(self):
-        #self.cortar_arbol(num_clusters=10, dist_max=dist_max)
-        print("NUM CLUSTERS")
-        print(len(self.clusters))
-        input("clusts")
-        X = []
-        Y = []
-        for c in self.clusters:
-            indices = self.obtener_nodos_finales(c)
-            instancias = [self.vectors[i] for i in indices]
-            X.extend(instancias)
-            Y.extend([c] * len(instancias))
-        
-        # Calcula la puntuación de la silueta
-        return X, Y
+            
+            colors = cm.nipy_spectral(cluster_labels.astype(float) / n_clusters)
+            ax2.scatter(X[:, 0], X[:, 1], marker=".", s=30, lw=0, alpha=0.7, c=colors, edgecolor="k")
+            centers = proc.clusters
+            
+            ax2.scatter(
+                centers[:, 0],
+                centers[:, 1],
+                marker="o",
+                c="white",
+                alpha=1,
+                s=200,
+                edgecolor="k",
+            )
+            
+            for i, c in enumerate(centers):
+                ax2.scatter(c[0], c[1], marker="$%d$" % i, alpha=1, s=50, edgecolor="k")
+
+            ax2.set_title("Visualizacion de los datos agrupados.")
+            ax2.set_xlabel("Feature space for the 1st feature")
+            ax2.set_ylabel("Feature space for the 2nd feature")
+            
+            plt.suptitle(
+                "Silhouette analysis for Hierarchical clustering on sample data with n_clusters = %d"
+                % num_clusters,
+                fontsize=14,
+                fontweight="bold",)
+
+        plt.show()
+
+            
 class hierarchical_clustering:
     def __init__(self, vectors, inter_distance_type,p=2):
         #CONSTRUCTORA DE LA CLASE DE ENTRENAMIENTO
