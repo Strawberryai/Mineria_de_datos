@@ -1,12 +1,15 @@
-from scipy.cluster.hierarchy import dendrogram
+from scipy.cluster.hierarchy import dendrogram, cophenet
+
 import matplotlib.pyplot as plt
 import matplotlib.pyplot as plt
 import numpy as np
 import random
+from scipy.spatial.distance import pdist
 from scipy.spatial import distance
 import pickle
 
-from sklearn.metrics import silhouette_score
+from sklearn.metrics import silhouette_score, silhouette_samples
+from sklearn.decomposition import PCA
 
 def help():
     print("########################Ayuda para el uso de la clase hierarchical_clustering####################################################")
@@ -92,21 +95,29 @@ class procesarCluster():
         distancia=99999
         nodo=None
         for x in self.centroides.keys():
-            nueva_dist = distance.minkowski(vector, self.centroides[x], p=self.grado)
+            if(self.grado==0):
+                nueva_dist = spatial.distance.cosine(self.centroides[x],vector)
+                #nueva_dist= np.linalg.norm(self.centroides[x] - vector)
+            else:
+                nueva_dist =  distance.minkowski(self.centroides[x],vector,self.grado)
+                
             #nueva_dist = np.linalg.norm(np.array(vector) - np.array(self.centroides[x]))
             if (nueva_dist<distancia):
                 distancia=nueva_dist
                 nodo=x
                 label=x
+                
         print("El punto:"+" pertenece al cluster:"+str(nodo)+" con una distancia de:"+str(distancia))
-        return(label)
+        
+        return(label, distancia, nodo)
+    
     def predict_multiple(self,vectors):
         #Pre: Se da una lista de vectores
         #Post: Devuelve un diccionario que asocia cada indice de la lista de vectores con el cluster al que pertenece
         labels={}
         i=0
         for x in vectors:
-            labels[i]=self.predict(x)
+            labels[i]=self.predict(x)[0]
             i+=1
         return(labels)
     def añadir_linkage(self,linkage,nodo):
@@ -195,64 +206,30 @@ class procesarCluster():
         
         # Calcula la puntuación de la silueta
         return silhouette_score(X, Y, metric='euclidean')
-   def metrics_evaluation(self, X_train, y_train, pred_labels, true_labels):
-        input("Metricas externas de evaluación: Cluster vs Class Evaluation")
-        pred_labels = [0, 0, 1, 1, 2, 2]
-        true_labels = [0, 0, 1, 2, 2, 2]
-        self.metricas_externas(true_labels, pred_labels)
-        
-        input("Metricas internas de evaluación: Evaluación de la estructura intrínseca de los datos")
-        self.dist_cofonetica()
-        for c in range(1,15,1):
-            self.metricas_internas(c)
-        
-        
-    def metricas_externas(self, true_labels, pred_labels):
-        # El ínidice de Jaccard: mide la similitud entre los conjustos de elementos dentro de los clusteres y las clases reales. 1 el mejor
-        # Indíce Rand: compara la simlitud entre pares de elementos del mismo cluster y clase real. Cuanto más alto mejor concordancia entre el clustering y las etiquetas reales
-        jaccard = jaccard_score(true_labels, pred_labels, average='weighted')
-        adjusted_rand = adjusted_rand_score(true_labels, pred_labels)
-        rand = rand_score(true_labels, pred_labels)
-        
-        print(f'Jackar index con un valor de {jaccard}')
-        print(f'Adjusted rand index con un valor de {adjusted_rand}')
-        print(f'Rand index con un valor de {rand}')
-        
-        N11, N10, N01, N00 = self.pairwise_comparision(true_labels, pred_labels)
-        print("N11: ", N11)
-        print("N10: ", N10)
-        print("N01: ", N01)
-        print("N00: ", N00)
-        
-        data = [[None, 'Mismo grupo', 'Diferente Grupo'], 
-                ['Mismo Cluster', N11, N10], 
-                ['Diferente Cluster', N01, N00]]
-        
-        fig, ax = plt.subplots()
-        ax.axis('equal')
-        ax.axis('off')
-        table = ax.table(cellText=data, cellLoc='center', loc='center', cellColours=[['palegreen']*3]*3)
-        table.auto_set_font_size(False)
-        table.set_fontsize(12)
-        table.scale(1,2)
-        
-        plt.show()
-        
-        # Calculo sin utilizar librerias
-        
-        jaccard = N11 / (N11 + N10 + N01)
-        rand = (N11+ N00) / (N11 + N10 + N01 + N00)
-        folkes_malow = sqrt((N11/(N11 + N01))*(N11/(N11 + N10)))
-        
-        print(f'Jackar index con un valor de {jaccard}')
-        print(f'Rand index con un valor de {rand}')
-        print(f'Folkes Malow index con un valor de {folkes_malow}')
-        
-        return 
     
-    def metricas_internas(self, n_clusts, y_train, X_train, labels):
-        self.silueta_eval(n_clusts)
-        self.cortar_arbol(num_clusters=n_clusts, dist_max=0)
+    def graph(self, ax, pca_, color='blue'):
+        PC_values = np.arange(pca_.n_components_) + 1
+        ax.plot(PC_values, pca_.explained_variance_ratio_, 'o-', linewidth=2, color=color)
+        plt.show()
+    
+    def graficar_dimensionalidad(self):
+        self.cortar_arbol(num_clusters=8, dist_max=0)
+        dim = max(len(vec) for vec in self.vectors)
+        print(dim)
+        #dim = 500
+        pca_ = PCA(n_components=dim)
+        pca_.fit(self.vectors)
+        print(pca_.n_components_)
+    
+        # simplemente graficar
+        fig, (ax1) = plt.subplots(1)
+        fig.suptitle('Variación de datos según la dimension')
+        self.graph(ax1, pca_)
+        
+    def etiquetas(self):
+        self.cortar_arbol(num_clusters=20, dist_max=0)
+        print("NUM CLUSTERS")
+        print(len(self.clusters))
         X = []
         Y = []
         for c in self.clusters:
@@ -260,72 +237,8 @@ class procesarCluster():
             instancias = [self.vectors[i] for i in indices]
             X.extend(instancias)
             Y.extend([c] * len(instancias))
-        # Calculo de Davies Bouldin 
-        davies_bouldin = davies_bouldin_score(X_train, labels)
-        # Calculo de homogeneidad de los clusters
-        homo_clusts = homogeneity_score(y_train, labels)
-        
-        return
-
-    def pairwise_comparision(self, part_C, part_G):
-        n_samples = len(part_C)
-        N11,N10, N01, N00 = 0, 0, 0, 0
-        
-        for i in range(n_samples):
-            for j in range(i+1, n_samples):
-                if part_C[i] == part_C[j] and part_G[i] == part_G[j]:
-                    N11 += 1
-                elif part_C[i] == part_C[j] and part_G[i] != part_G[j]:
-                    N10 += 1
-                elif part_C[i] != part_C[j] and part_G[i] == part_G[j]:
-                    N01 += 1
-                elif part_C[i] != part_C[j] and part_G[i] != part_G[j]:
-                    N00 += 1
-
-        return N11, N10, N01, N00
+        return X, Y
     
-    
-    def silueta_eval(self, c):
-        input("evaluacion de silueta")
-        resultados = {}
-        siluetas = {}
-        #n_dims = list(range(1, max(len(vec) for vec in self.vectors) + 1))
-        #dists = self.rango_de_distancias(self.vectors)
-        X = self.cortar_arbol(num_clusters=c, dist_max=0)
-        X_fit = np.array(X)
-        print(X_fit)
-        #nodos_X = self.obtener_nodos_finales(self.nodoPadre)
-        #print(nodos_X)
-        input("silueta calculo")
-        # Obtenemos las etiquetas
-        labels_dic = self.predict_multiple(X_fit)
-        labels = self.dict_to_array(labels_dic ,len(X_fit))
-        print(labels)
-        input("labels")
-        silueta = 0
-        if len(np.unique(labels))>1:
-            silueta = silhouette_score(X, labels, metric='euclidean')  # Calcula la puntuación de la silueta
-        # Almacena los resultados en un diccionario
-        resultado = {
-            'clusters': c,
-            'silueta': silueta
-        }
-        resultados[c] = resultado
-
-        # Después de recorrer todas las combinaciones, imprime o utiliza los resultados y siluetas
-        print("Resultados:", resultados)
-        self.graficar_siluetas(siluetas)
-    
-    def graficar_siluetas(self, siluetas):
-            # Representamos los resultados en una gráfica de barras
-            
-            fig, ax = plt.subplots(figsize=(5,2))
-            ax.set_xlabel('label')
-            ax.set_ylabel('Silhouette score')
-
-            plt.bar(siluetas.keys(), siluetas.values(), align='center', color='#007acc')
-            input("graficando siluetas")
-            
     def dist_cofonetica(self):
         # Esta métrica mide cuán bien la jerarquía de clustering representa la estructura original de tus datos
         # Mide la correlación entre las distancias cophenéticas (distancias entre los elementos originales) 
@@ -343,49 +256,11 @@ class procesarCluster():
         c, coph_dists = cophenet(linkage, pdist(self.vectors))
         print(c)
         print(coph_dists)
+        print(len(coph_dists))
         # c es la distancia de correlación cofenética
         # coph_dists contiene las distancias cophenéticas entre tus datos, 
         # estos sonla representación jerárquica de las distancias entre los elementos originales
-        input("cofonetica")    
-    
-    def graph(ax, pca_t, color='blue'):
-        PC_values = np.arange(pca_t.n_components_) + 1
-        ax.plot(PC_values, pca.explained_variance_ratio_, 'o-', linewidth=2, color=color)
-    
-    def graficar_dimensionalidad(self):
-        self.cortar_arbol(num_clusters=8, dist_max=0)
-        dim = max(len(vec) for vec in self.vectors)
-        pca = PCA(n_components=dim)
-        pca.fit(self.vectors)
-    
-        # simplemente graficar
-        fig, (ax1) = plt.subplots(1)
-        fig.suptittle('Variación de datos según la dimension')
-        graph(ax1, pca)
-    def dimension_mas_optima(self):
-        # Inicializa el PCA y ajusta los datos
-        pca = PCA()
-        pca.fit(train_corpus)
-
-        # Calcula la varianza explicada acumulada
-        cumulative_variance_ratio = np.cumsum(pca.explained_variance_ratio_)
-
-        # Encuentra el número de componentes que preservan al menos el 95% de la varianza
-        n_components_95 = np.argmax(cumulative_variance_ratio >= 0.95) + 1
-
-        # Encuentra el número de componentes que preservan al menos el 99% de la varianza
-        n_components_99 = np.argmax(cumulative_variance_ratio >= 0.99) + 1
-
-        print(f'Número de componentes para el 95% de varianza acumulada: {n_components_95}')
-        print(f'Número de componentes para el 99% de varianza acumulada: {n_components_99}')
-
-        print('Dim originally: ',X_train.shape)
-        # Reducir las dimensiones para visualizarlas: PCA
-        pca = PCA(n_components=n_components_95)
-        pca.fit(X_train)
-        # Cambio de base a dos dimensiones PCA
-        X_train_PCAspace = pca.transform(X_train)
-        print('Dim after PCA: ',X_train_PCAspace.shape)   
+        input("cofonetica") 
 
     def graficacion_siluetas(self):
         rango_n_clusts = list(range(2,6,1))
@@ -398,7 +273,7 @@ class procesarCluster():
             # este puede ir de -1, 1 but in this example all
             ax1.set_xlim([-0.1, 1])
             # añadir separacion entre las siluetas individuales de cada cluster
-            ax1.set_ylim([0, len(X) + (n_clusters + 1) * 10])
+            ax1.set_ylim([0, len(self.vectors) + (num_clusters + 1) * 10])
             print("NUM CLUSTERS")
             self.cortar_arbol(num_clusters=num_clusters, dist_max=0)
             X = []
@@ -408,30 +283,59 @@ class procesarCluster():
                 instancias = [self.vectors[i] for i in indices]
                 X.extend(instancias)
                 Y.extend([c] * len(instancias))
-            siluet = silhouette_score(X, Y, metric='euclidean')
-            print("For n_clusters =",n_clusters, "La media silhouette_score es :",
+            siluet = silhouette_samples(X, Y, metric='euclidean')
+            print("For n_clusters =",num_clusters, "La media silhouette_score es :",
             siluet,)
             
             y_lower = 10
-            for i in range(n_clusters):
+            for i in range(num_clusters):
                 # Aggregate the silhouette scores for samples belonging to
                 # cluster i, and sort them
-                ith_cluster_silhouette_values = sample_silhouette_values[cluster_labels == i]
+                ith_cluster_silhouette_values = siluet[Y == i]
 
                 ith_cluster_silhouette_values.sort()
 
                 size_cluster_i = ith_cluster_silhouette_values.shape[0]
                 y_upper = y_lower + size_cluster_i
 
-                color = cm.nipy_spectral(float(i) / n_clusters)
+                color = cm.nipy_spectral(float(i) / num_clusters)
                 ax1.fill_betweenx(
                     np.arange(y_lower, y_upper),
                     0,
                     ith_cluster_silhouette_values,
                     facecolor=color,
                     edgecolor=color,
-                    alpha=0.7,
-                )    
+                    alpha=0.7,)
+                # Etiquetar los plots de silueta con sus numeros de clusters en el medio
+                ax1.text(-0.05, y_lower + 0.5 * size_cluster_i, str(i))
+
+                # Calcular el nuevo y_lower para el siguiente plot
+                y_lower = y_upper + 10  # 10 for the 0 samples
+
+            ax1.set_title("La gŕafica de silueta para varios clusters")
+            ax1.set_xlabel("Los valores de los coeficientes de silueta")
+            ax1.set_ylabel("Etiqueta cluster")
+
+            # The vertical line for average silhouette score of all the values
+            ax1.axvline(x=silhouette_avg, color="red", linestyle="--")
+
+            ax1.set_yticks([])  # Clear the yaxis labels / ticks
+            ax1.set_xticks([-0.1, 0, 0.2, 0.4, 0.6, 0.8, 1])
+    def etiquetas(self):
+        #self.cortar_arbol(num_clusters=10, dist_max=dist_max)
+        print("NUM CLUSTERS")
+        print(len(self.clusters))
+        input("clusts")
+        X = []
+        Y = []
+        for c in self.clusters:
+            indices = self.obtener_nodos_finales(c)
+            instancias = [self.vectors[i] for i in indices]
+            X.extend(instancias)
+            Y.extend([c] * len(instancias))
+        
+        # Calcula la puntuación de la silueta
+        return X, Y
 class hierarchical_clustering:
     def __init__(self, vectors, inter_distance_type,p=2):
         #CONSTRUCTORA DE LA CLASE DE ENTRENAMIENTO
