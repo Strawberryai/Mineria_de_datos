@@ -32,15 +32,14 @@ def mapeo_de_labels(datos_df, columna):
         "1":    ["Leukemia/Lymphomas", "Colorectal Cancer", "Lung Cancer", "Cervical Cancer", "Breast Cancer", "Stomach Cancer", "Prostate Cancer", "Esophageal Cancer", "Other Cancers"],
         "2":    ["Diabetes"],
         "3":    ["Epilepsy"],
-        "4":    ["Stroke"],
-        "5":    ["Acute Myocardial Infarction"],
-        "6":    ["Pneumonia", "Asthma", "COPD"],
-        "7":    ["Cirrhosis", "Other Digestive Diseases"],
-        "8":    ["Renal Failure"],
-        "9":    ["Preterm Delivery", "Stillbirth", "Maternal", "Birth Asphyxia"],
-        "10":   ["Congenital Malformations"],
-        "11":   ["Bite of Venomous Animal", "Poisonings"],
-        "12":   ["Road Traffic", "Falls", "Homicide", "Fires", "Drowning", "Suicide", "Violent Death", "Other injuries"]
+        "4":    ["Stroke", "Acute Myocardial Infarction"],
+        "5":    ["Pneumonia", "Asthma", "COPD"],
+        "6":    ["Cirrhosis", "Other Digestive Diseases"],
+        "7":    ["Renal Failure"],
+        "8":    ["Preterm Delivery", "Stillbirth", "Maternal", "Birth Asphyxia"],
+        "9":    ["Congenital Malformations"],
+        "10":   ["Bite of Venomous Animal", "Poisonings"],
+        "11":   ["Road Traffic", "Falls", "Homicide", "Fires", "Drowning", "Suicide", "Violent Death", "Other injuries"]
     }
     # Convertir el diccionario de mapeo original a minúsculas
     mapeo = {etiqueta.lower(): [clase.lower() for clase in clases] for etiqueta, clases in mapeo.items()}
