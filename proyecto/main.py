@@ -185,7 +185,7 @@ def scatter_2D(vectores, labels, y_train):
     # Cambio de base a dos dimensiones PCA 
     x_train_PCAspace = pca.transform(vectores)
     print('Dimensiones después de aplicar PCA: ')
-    samples = 300 # Número de instancias a dibujar
+    samples = 300 # NúmlogisticRegr.fit(x_train, y_train)ero de instancias a dibujar
     # Dibujar los puntos en el espacio, color: cluster, etiqueta-numérica: clase
     # Color del punto: cluster
     sc = plt.scatter(x_train_PCAspace[:samples,0],x_train_PCAspace[:samples,1], cmap=plt.cm.get_cmap('nipy_spectral', 10),c=list(labels.values())[:samples])
