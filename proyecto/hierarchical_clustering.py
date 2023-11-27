@@ -198,9 +198,9 @@ class procesarCluster():
         print("Los centroides son:"+str(self.centroides))
         #self.draw_dendrogram()
 
-    def save(self):
+    def save(self,x):
         #Funcion para guardar el modelo
-        filename = f"{self.distance_type}_{self.num_clusters}.pkl"
+        filename = f"{self.distance_type}_{self.num_clusters}_n200_{x}.pkl"
         with open(filename, 'wb') as file:
             pickle.dump(self, file)
         print(f"Guardado en {filename}")
